@@ -10,10 +10,27 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,700;0,800;1,800&family=Inter:wght@400;500;600;700&display=swap" />
+  <script>
+    // If anything breaks while loading, say so on screen instead of leaving a dead page.
+    (function () {
+      function show(detail) {
+        if (document.getElementById('fatal')) return;
+        var box = document.createElement('p');
+        box.id = 'fatal';
+        box.setAttribute('role', 'alert');
+        box.style.cssText = 'position:fixed;inset:16px 16px auto;z-index:99;margin:0;padding:14px 16px;background:#fde4e1;border:3px solid #111418;border-radius:12px;font:600 16px/1.4 system-ui,sans-serif;color:#111418';
+        box.textContent = 'Sorry, this page didn\'t load properly. Please refresh. If it keeps happening, contact ElliotAI. (Details: ' + detail + ')';
+        (document.body || document.documentElement).prepend(box);
+      }
+      window.addEventListener('error', function (e) { if (e.message) show(e.message); });
+      window.addEventListener('unhandledrejection', function (e) { show((e.reason && e.reason.message) || String(e.reason)); });
+    })();
+  </script>
   <title>Log in · ElliotAI</title>
   <script>
-    // Invite and reset emails land here by default. Send them to "set your password" first.
-    if (/type=(invite|recovery)/.test(location.hash + location.search)) {
+    // Invite and reset email links (including expired ones) land here by default.
+    // Send them to the set-password page, which knows how to handle them.
+    if (/access_token=|token_hash=|error_description=|type=(invite|recovery)/.test(location.hash + location.search)) {
       location.replace('/reset-password.html' + location.search + location.hash);
     }
   </script>

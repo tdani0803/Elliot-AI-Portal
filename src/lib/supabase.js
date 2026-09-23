@@ -8,6 +8,7 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 if (!DEMO_MODE && (!url || !anonKey)) {
   // Show the problem on screen instead of leaving buttons that silently do nothing.
   const box = document.createElement('p');
+  box.id = 'fatal';
   box.setAttribute('role', 'alert');
   box.style.cssText =
     'position:fixed;inset:16px 16px auto;z-index:99;margin:0;padding:14px 16px;background:#fde4e1;' +
@@ -19,7 +20,8 @@ if (!DEMO_MODE && (!url || !anonKey)) {
   throw new Error('Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY. See .env.example.');
 }
 
-export const supabase = DEMO_MODE ? null : createClient(url, anonKey);
+// Email links are handled explicitly on the set-password page (see reset.js).
+export const supabase = DEMO_MODE ? null : createClient(url, anonKey, { auth: { detectSessionInUrl: false } });
 
 export const PAGES = {
   login: '/',

@@ -6,31 +6,78 @@ import { friendlyAuthError, setBusy, showMessage } from './ui.js';
 
 const form = document.getElementById('reset-form');
 const errorEl = document.getElementById('error');
-const EXPIRED = 'This link has expired or already been used. Request a new one from "Forgot password?".';
+const statusEl = document.getElementById('status');
+const TIMEOUT_MS = 15000;
 
+// Supabase can send people here in several shapes depending on project settings and
+// email templates. Handle each one explicitly rather than relying on auto-detection.
 async function establishSession() {
-  if (DEMO_MODE) return true;
+  if (DEMO_MODE) return {};
   const query = new URLSearchParams(location.search);
   const hash = new URLSearchParams(location.hash.slice(1));
-  if (query.get('error') || hash.get('error')) return false;
+  const clearUrl = () => history.replaceState(null, '', location.pathname);
 
-  // Custom email templates may link with ?token_hash=…&type=recovery|invite.
+  const linkError = query.get('error_description') || hash.get('error_description') || query.get('error') || hash.get('error');
+  if (linkError) {
+    clearUrl();
+    return { error: linkError };
+  }
+
+  // 1. Default links: #access_token=…&refresh_token=…&type=invite|recovery
+  const accessToken = hash.get('access_token');
+  const refreshToken = hash.get('refresh_token');
+  if (accessToken && refreshToken) {
+    const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+    clearUrl();
+    return { error: error?.message };
+  }
+
+  // 2. Custom email templates: ?token_hash=…&type=recovery|invite
   const tokenHash = query.get('token_hash');
   if (tokenHash) {
     const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: query.get('type') ?? 'recovery' });
-    history.replaceState(null, '', location.pathname);
-    return !error;
+    clearUrl();
+    return { error: error?.message };
   }
-  // Default links (#access_token=… or ?code=…) are picked up by supabase-js on load.
+
+  // 3. PKCE links: ?code=…
+  const code = query.get('code');
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    clearUrl();
+    return { error: error?.message };
+  }
+
+  // 4. Already signed in (e.g. page refreshed after the link was used).
   const { data } = await supabase.auth.getSession();
-  return Boolean(data.session);
+  return data.session ? {} : { error: 'No link details found' };
 }
 
-if (await establishSession()) {
+function explain(reason) {
+  const r = reason.toLowerCase();
+  if (r.includes('timeout')) return "Couldn't reach the login server. Check your internet and try again.";
+  if (r.includes('no link details')) {
+    return 'Open this page using the link in your email. No email? Click "Forgot password?" to get a new one.';
+  }
+  return 'This link has expired or already been used. Click "Forgot password?" below to get a new one.';
+}
+
+const timeout = new Promise((resolve) => setTimeout(() => resolve({ error: 'timeout' }), TIMEOUT_MS));
+let result;
+try {
+  result = await Promise.race([establishSession(), timeout]);
+} catch (err) {
+  result = { error: err?.message || 'unknown error' };
+}
+statusEl.hidden = true;
+
+if (!result.error) {
   form.hidden = false;
   form.password.focus();
 } else {
-  showMessage(errorEl, EXPIRED);
+  console.error('Set password link problem:', result.error);
+  showMessage(errorEl, `${explain(result.error)} (Details: ${result.error})`);
+  document.getElementById('forgot-link').hidden = false;
 }
 
 form.addEventListener('submit', async (event) => {
@@ -46,7 +93,7 @@ form.addEventListener('submit', async (event) => {
   const { error } = await supabase.auth.updateUser({ password });
   if (error) {
     setBusy(form, false);
-    return showMessage(errorEl, friendlyAuthError(error));
+    return showMessage(errorEl, `${friendlyAuthError(error)} (Details: ${error.message})`);
   }
   location.replace(PAGES.dashboard);
 });
