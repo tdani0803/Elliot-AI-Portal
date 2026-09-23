@@ -5,13 +5,19 @@ export function hasSupabaseEnv() {
   return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
-export async function rest(path, init = {}) {
+// New-style Supabase keys ("sb_secret_…") go in the apikey header only — they aren't
+// JWTs, so sending them as "Authorization: Bearer" gets rejected. Legacy service_role
+// keys are JWTs and need both headers.
+export function serviceHeaders() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY.trim();
+  return key.startsWith('sb_') ? { apikey: key } : { apikey: key, Authorization: `Bearer ${key}` };
+}
+
+export async function rest(path, init = {}) {
   const res = await fetch(`${normaliseSupabaseUrl(process.env.SUPABASE_URL)}/rest/v1/${path}`, {
     ...init,
     headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
+      ...serviceHeaders(),
       'Content-Type': 'application/json',
       ...init.headers,
     },
@@ -29,9 +35,8 @@ export async function restJson(path, init) {
 // Who is calling? Verifies a logged-in user's access token with Supabase Auth.
 export async function userFromToken(token) {
   if (!token) return null;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY.trim();
   const res = await fetch(`${normaliseSupabaseUrl(process.env.SUPABASE_URL)}/auth/v1/user`, {
-    headers: { apikey: key, Authorization: `Bearer ${token}` },
+    headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY.trim(), Authorization: `Bearer ${token}` },
   });
   if (!res.ok) return null;
   return res.json();

@@ -63,7 +63,11 @@ export async function enableNotifications(clientId) {
   if (permission !== 'granted') return permission;
   const reg = await navigator.serviceWorker.ready;
   const res = await fetch('/api/push-config');
-  if (!res.ok) throw new Error("Notifications aren't set up on the server yet.");
+  if (!res.ok) {
+    const info = await res.json().catch(() => ({}));
+    const why = info.reason ?? (res.status === 404 ? 'The server part is missing — redeploy the site in Netlify.' : `Error ${res.status}`);
+    throw new Error(`Notifications aren't set up on the server yet. (Details: ${why})`);
+  }
   const { publicKey } = await res.json();
   const sub =
     (await reg.pushManager.getSubscription()) ??

@@ -91,7 +91,13 @@ function toIso(value) {
 function fromEndOfCallReport(msg) {
   const call = msg.call ?? {};
   const toolArgs = findSendTextArgs(msg.artifact?.messages ?? msg.messages);
-  const fields = { ...pickFields(msg.analysis?.structuredData), ...pickFields(toolArgs) };
+  // Vapi "Structured Outputs" (newer accounts) arrive as { <id>: { name, result } }.
+  const outputs = Object.values(msg.artifact?.structuredOutputs ?? {}).map((o) => o?.result ?? o);
+  const fields = {
+    ...Object.assign({}, ...outputs.map(pickFields)),
+    ...pickFields(msg.analysis?.structuredData),
+    ...pickFields(toolArgs),
+  };
 
   const startedAt = msg.startedAt ?? call.startedAt ?? call.createdAt;
   const endedAt = msg.endedAt ?? call.endedAt;

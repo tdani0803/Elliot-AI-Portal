@@ -42,3 +42,60 @@ test('push-test refuses people who are not logged in', async () => {
   const res = await pushTest(new Request('https://site/api/push-test', { method: 'POST', headers: { Authorization: 'Bearer nope' } }));
   assert.equal(res.status, 401);
 });
+
+test('new sb_secret keys are sent as apikey only; legacy JWT keys also as Bearer', async () => {
+  const { serviceHeaders } = await import('../netlify/lib/rest.mjs');
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'sb_secret_abc';
+  assert.deepEqual(serviceHeaders(), { apikey: 'sb_secret_abc' });
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOi.legacy.jwt';
+  assert.deepEqual(serviceHeaders(), { apikey: 'eyJhbGciOi.legacy.jwt', Authorization: 'Bearer eyJhbGciOi.legacy.jwt' });
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key';
+});
+
+test('webhook accepts the secret on the URL (for Vapi screens without a secret box)', async () => {
+  const { default: webhook } = await import('../netlify/functions/vapi-webhook.mjs');
+  process.env.VAPI_WEBHOOK_SECRET = 'url-secret';
+  const body = JSON.stringify({ message: { type: 'status-update' } });
+  const ok = await webhook(new Request('https://site/api/vapi-webhook?secret=url-secret', { method: 'POST', body }));
+  const bad = await webhook(new Request('https://site/api/vapi-webhook?secret=nope', { method: 'POST', body }));
+  assert.equal(ok.status, 200);
+  assert.equal(bad.status, 401);
+});
+
+test('push-config explains why notifications are not ready', async () => {
+  const { default: pushConfig } = await import('../netlify/functions/push-config.mjs');
+  globalThis.fetch = async () => new Response(JSON.stringify({ message: 'relation "public.app_secrets" does not exist' }), { status: 404 });
+  const res = await pushConfig(new Request('https://site/api/push-config'));
+  assert.equal(res.status, 503);
+  assert.match((await res.json()).reason, /20260925000000_alerts\.sql/);
+});
+
+test('end-of-call Structured Data becomes a lead (no Send Text tool needed)', async () => {
+  const { parseWebhook } = await import('../netlify/lib/parse-call.mjs');
+  const { row } = parseWebhook({
+    message: {
+      type: 'end-of-call-report',
+      call: { id: 'c1', assistantId: 'a1', customer: { number: '+61400000000' } },
+      analysis: {
+        summary: 'Leaking roof',
+        structuredData: { name: 'Sam', address: '1 A St, Ryde', issue: 'Roof leak', urgency: 'Somewhat Urgent', job_type: 'Roof leak' },
+      },
+    },
+  });
+  assert.equal(row.caller_name, 'Sam');
+  assert.equal(row.urgency, 'somewhat_urgent');
+  assert.equal(row.callback_number, '+61400000000'); // falls back to caller ID
+});
+
+test('newer Vapi "Structured Outputs" are read too', async () => {
+  const { parseWebhook } = await import('../netlify/lib/parse-call.mjs');
+  const { row } = parseWebhook({
+    message: {
+      type: 'end-of-call-report',
+      call: { id: 'c2', assistantId: 'a1' },
+      artifact: { structuredOutputs: { 'so-1': { name: 'Lead details', result: { name: 'Jo', urgency: 'Urgent', issue: 'Burst pipe' } } } },
+    },
+  });
+  assert.equal(row.caller_name, 'Jo');
+  assert.equal(row.urgency, 'urgent');
+});

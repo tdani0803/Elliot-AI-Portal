@@ -193,14 +193,19 @@ You'll see a page that says **"ElliotAI just needs to link it to your business."
 
 ### Step B: Tell Vapi where to send calls
 
-1. In **Vapi**, on your assistant, find **Server URL**. Try the **Advanced** tab.
-2. Paste your `WEBSITE` with `/api/vapi-webhook` on the end. For example:
-   `https://elliotai-portal.netlify.app/api/vapi-webhook`
-3. Find the **Secret** box near it. It might be called **Server Secret**, **Secret Token** or **Credential**.
-   Paste your `VAPI SECRET`.
-4. Click **Publish** or **Save**.
+1. In **Vapi**, on your assistant, find **Server URL**. Try the **Advanced** tab, or a section called **Server** or **Messaging**.
+2. Paste in your link, built from **3 pieces with no spaces**:
 
-> **Can't find the Secret box?** Send a screenshot of the page and we'll find it together. Without it, calls won't show up.
+   ```
+   your WEBSITE  +  /api/vapi-webhook?secret=  +  your VAPI SECRET
+   ```
+
+   For example: `https://elliotai-portal.netlify.app/api/vapi-webhook?secret=abc123xyz789`
+
+3. **Only if you also see a Secret box** next to it, paste your `VAPI SECRET` in there too. If there's no Secret box, that's fine: the secret is already in the link.
+4. Click **Publish**.
+
+> Your `VAPI SECRET` should be letters and numbers only. If it has symbols like `&`, `#` or `?`, change it in Netlify (Step 6) to letters and numbers, then redeploy.
 
 ---
 
@@ -280,18 +285,30 @@ Go to **Supabase → Table Editor → clients**:
 
 > ⚠️ **Elliot must say the same thing.** In Vapi, make sure the assistant's prompt tells callers the same times, for example *"If it's urgent, tell them someone will call back within 1 hour. Otherwise, within 4 hours."* The notification repeats this promise, and the portal marks the lead **Overdue** once the time passes.
 
-### Step C: Stop the old text messages
+### Step C: Let Vapi hand over the caller's details
 
-Your **Send Text** tool in Vapi can now send the lead to the portal instead of texting.
+You **don't** need to change your SMS tool. Vapi can pick out the caller's details at the end of every call by itself, and send them to the portal.
 
-1. In **Vapi**, go to **Tools** and open your **Send Text** tool.
-2. Change its **Server URL** to your `WEBSITE` with `/api/vapi-webhook` on the end. This is the same link as in Part 7.
-3. Put your `VAPI SECRET` in its **Secret** box.
-4. Click **Save**.
+1. In **Vapi**, open your assistant and click the **Analysis** tab.
+2. Find **Structured Data** (on newer accounts it may be called **Structured Outputs**) and turn it on.
+3. In the **prompt** box, paste:
+   > Pull out the caller's details from this call. Urgency must be exactly one of: Urgent, Somewhat Urgent, Non-Urgent, Irrelevant. Use Irrelevant for spam, wrong numbers or anything that isn't a job.
+4. Add these fields. Each one is a **string** (text):
 
-The tool keeps collecting the caller's name, number, address, issue and urgency. Now they go straight into the portal, and the tradie gets a phone notification instead of a text.
+   | Field name (type exactly) | Description |
+   |---|---|
+   | `name` | Caller's name |
+   | `callback_number` | Best number to call them back on |
+   | `address` | Job address including suburb |
+   | `issue` | Short summary of the problem, e.g. Roof leak over kitchen |
+   | `details` | Any extra details they gave |
+   | `urgency` | Urgent, Somewhat Urgent, Non-Urgent or Irrelevant |
+   | `job_type` | Type of job, e.g. Roof leak, Gutters, Tiling |
 
-> **No Server URL box on your Send Text tool?** Then it's Vapi's built-in SMS tool. Create a new **Function** tool called `send_text` instead. The settings to paste are in [docs/TECHNICAL.md](docs/TECHNICAL.md#send-text-tool-replacement). Add it to the assistant, then remove the old SMS tool.
+   If Vapi lets you paste JSON instead, use the one in [docs/TECHNICAL.md](docs/TECHNICAL.md#vapi-structured-data).
+5. Click **Publish**.
+
+**Once the test notification works (Step D),** remove the old **SMS tool** from the assistant. Otherwise the tradie gets both a text and a notification for every call. Until then, leave it on as a safety net.
 
 ### Step D: Set up the phone (do this with each client, it takes 1 minute)
 

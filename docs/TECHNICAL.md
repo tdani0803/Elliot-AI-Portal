@@ -244,3 +244,31 @@ Parameters:
 ```
 
 The webhook saves these straight onto the call, sends the new-lead alert, and replies "Details sent."
+
+## Vapi Structured Data
+
+This is the recommended way to get caller details, and needs no tool changes. Put it in the assistant's **Analysis → Structured Data** schema. On newer accounts it's **Structured Outputs**, which arrive in `artifact.structuredOutputs`; the webhook reads both.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "name": { "type": "string", "description": "Caller's name" },
+    "callback_number": { "type": "string", "description": "Best number to call them back on" },
+    "address": { "type": "string", "description": "Job address including suburb" },
+    "issue": { "type": "string", "description": "Short summary of the problem, e.g. Roof leak over kitchen" },
+    "details": { "type": "string", "description": "Any extra details they gave" },
+    "urgency": { "type": "string", "enum": ["Urgent", "Somewhat Urgent", "Non-Urgent", "Irrelevant"] },
+    "job_type": { "type": "string", "description": "Category, e.g. Roof leak, Gutters, Tiling" }
+  }
+}
+```
+
+Vapi's built-in SMS tool has no server URL, so its message body can't be read reliably. Structured Data replaces it as the source of lead details. If `callback_number` is missing, the webhook falls back to the caller ID.
+
+**Webhook auth:** the secret may be sent in any of these three ways:
+- the `X-Vapi-Secret` header,
+- `Authorization: Bearer <secret>` (a Vapi "Bearer Token" credential),
+- `?secret=<secret>` on the Server URL, for Vapi screens without a secret field.
+
+**Supabase keys:** the new `sb_secret_…` keys are sent only in the `apikey` header. Legacy service_role JWTs are sent as `apikey` plus `Authorization: Bearer`.

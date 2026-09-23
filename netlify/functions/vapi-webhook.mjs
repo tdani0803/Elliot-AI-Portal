@@ -26,7 +26,9 @@ function sameSecret(given, expected) {
 function isAuthorised(req, expected) {
   const header = req.headers.get('x-vapi-secret') ?? '';
   const bearer = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
-  return [header, bearer].some((given) => given && sameSecret(given, expected));
+  // Some Vapi screens have no secret box, so the secret can also ride on the URL: ?secret=…
+  const query = new URL(req.url).searchParams.get('secret') ?? '';
+  return [header, bearer, query].some((given) => given && sameSecret(given, expected));
 }
 
 async function findClient(assistantId, columns = 'id') {
