@@ -71,7 +71,7 @@ The webhook reads the caller details (name, callback_number, address, issue, det
 
 ### 3. Vapi (per assistant)
 - Set **Server URL** to `https://portal.elliotai.com.au/api/vapi-webhook`.
-- Set **Server secret** (sent as the `X-Vapi-Secret` header) to your `VAPI_WEBHOOK_SECRET`, **or** append it to the URL as `?secret=<VAPI_WEBHOOK_SECRET>`. The header is slightly better, because query strings can end up in logs.
+- Set **Server secret** (sent as the `X-Vapi-Secret` header) to your `VAPI_WEBHOOK_SECRET`.
 - Make sure `end-of-call-report` is included in the server messages. It is by default.
 
 ## Onboarding a new client
