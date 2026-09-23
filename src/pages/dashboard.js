@@ -240,7 +240,7 @@ async function start() {
   if (!state.client) {
     $('business').textContent = 'Almost there';
     document.querySelector('.hello__sub').textContent =
-      "Your account isn't linked to a business yet. Give us a call and we'll get it sorted.";
+      "Your account is made. ElliotAI just needs to link it to your business. Once that's done, your calls show up here.";
     document.querySelectorAll('.range, .hero, .stats, .urgency, .calls').forEach((el) => (el.hidden = true));
     $('page').setAttribute('aria-busy', 'false');
     return;

@@ -9,6 +9,7 @@ export default defineConfig({
         dashboard: resolve(import.meta.dirname, 'dashboard.html'),
         forgot: resolve(import.meta.dirname, 'forgot-password.html'),
         reset: resolve(import.meta.dirname, 'reset-password.html'),
+        signup: resolve(import.meta.dirname, 'signup.html'),
       },
     },
   },

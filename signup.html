@@ -26,38 +26,35 @@
       window.addEventListener('unhandledrejection', function (e) { show((e.reason && e.reason.message) || String(e.reason)); });
     })();
   </script>
-  <title>Log in · ElliotAI</title>
-  <script>
-    // Invite and reset email links (including expired ones) land here by default.
-    // Send them to the set-password page, which knows how to handle them.
-    if (/access_token=|token_hash=|error_description=|type=(invite|recovery)/.test(location.hash + location.search)) {
-      location.replace('/reset-password.html' + location.search + location.hash);
-    }
-  </script>
+  <title>Create account · ElliotAI</title>
 </head>
 <body>
   <main class="auth">
     <div class="auth__wrap">
     <img class="auth__logo" src="/logo.png" alt="ElliotAI" width="260" height="66" />
     <div class="card auth__card">
-      <h1 class="auth__title">Log in</h1>
+      <h1 class="auth__title">Create account</h1>
       <p class="notice notice--error" id="error" role="alert" hidden></p>
-      <form class="auth__form" id="login-form" method="post" novalidate>
+      <p class="notice notice--ok" id="ok" role="status" hidden></p>
+      <form class="auth__form" id="signup-form" method="post" novalidate>
         <div class="field">
           <label for="email">Email</label>
           <input id="email" name="email" type="email" autocomplete="email" inputmode="email" required />
         </div>
         <div class="field">
           <label for="password">Password</label>
-          <input id="password" name="password" type="password" autocomplete="current-password" required />
+          <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required />
         </div>
-        <button class="btn btn--block" type="submit">Log in</button>
+        <div class="field">
+          <label for="confirm">Type it again</label>
+          <input id="confirm" name="confirm" type="password" autocomplete="new-password" minlength="8" required />
+        </div>
+        <button class="btn btn--block" type="submit">Create account</button>
       </form>
-      <p class="auth__links"><a href="/forgot-password.html">Forgot password?</a></p>
-      <p class="auth__links">New here? <a href="/signup.html">Create an account</a></p>
+      <p class="auth__links">Already have an account? <a href="/">Log in</a></p>
     </div>
     </div>
   </main>
-  <script type="module" src="/src/pages/login.js"></script>
+  <script type="module" src="/src/pages/signup.js"></script>
 </body>
 </html>

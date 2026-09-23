@@ -9,6 +9,7 @@ A secure dashboard where each ElliotAI client, a trade business, logs in and see
 | Path | What it is |
 |---|---|
 | `index.html` | Login (email + password, logo, nothing else) |
+| `signup.html` | Self-service login creation (shows nothing until linked to a business) |
 | `forgot-password.html` / `reset-password.html` | Forgot-password flow. The reset page also handles first-time invite links. |
 | `dashboard.html` | The only screen a client uses: headline value, 4 stat tiles, urgency split, calls log, and a This Week / This Month / All Time toggle |
 | `src/styles/brand.css` | Brand tokens (colours, fonts, borders). **Reuse this on the website.** |
@@ -51,7 +52,7 @@ The webhook reads the caller details (name, callback_number, address, issue, det
 ### 1. Supabase
 1. Create a project at supabase.com (Sydney region).
 2. Open **SQL Editor**, paste `supabase/migrations/20260923000000_init.sql`, and run it. With the Supabase CLI, `supabase db push` does the same.
-3. Go to **Authentication → Providers → Email**: keep it on and **turn off "Allow new users to sign up"**. Clients only get in by invite.
+3. Go to **Authentication → Sign In / Providers**: keep **Allow new users to sign up** on and turn **Confirm email** off. Anyone can create a login on `/signup.html`, but row-level security means it sees nothing until you link it to a `clients` row. This avoids Supabase's built-in email limit, which is only a few emails per hour on the free plan. To go invite-only later, turn sign-ups off and set up custom SMTP.
 4. Go to **Authentication → URL Configuration**: set Site URL to `https://portal.elliotai.com.au` and add `https://portal.elliotai.com.au/reset-password.html` to the redirect URLs.
 5. Optional: edit the **Invite** and **Reset password** email templates so they sound like ElliotAI.
 

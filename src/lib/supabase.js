@@ -28,4 +28,5 @@ export const PAGES = {
   dashboard: '/dashboard.html',
   forgot: '/forgot-password.html',
   reset: '/reset-password.html',
+  signup: '/signup.html',
 };
