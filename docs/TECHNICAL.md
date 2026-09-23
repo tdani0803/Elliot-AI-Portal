@@ -112,3 +112,71 @@ curl -X POST http://localhost:8888/api/vapi-webhook \
 
 ## Deliberately left out
 Job-software integrations (ServiceM8, simPRO), team/multi-user accounts, per-client theming, and any client-facing settings or admin screens.
+
+
+## Pro features (migration `20260924000000_pro_features.sql`)
+
+- **calls**: `recording_url`, `transcript`, `summary`, `job_type` (filled by the webhook from the end-of-call report), and `lead_status` (`new`/`called_back`/`quoted`/`won`/`lost`), `won_value`, `notes`, `assigned_to`, plus `status_updated_at`, which a trigger stamps. Logged-in clients may update **only** `lead_status`, `won_value`, `notes` and `assigned_to` on their own calls. This is enforced by column grants and RLS.
+- **clients**: `monthly_fee` (used for "paid for itself ×"), `timezone`, `business_hours` (jsonb, `{"mon":["07:00","17:00"], ..., "sun":null}`), `review_url`.
+- **client_members**: team logins. `my_client_ids()` (security definer) returns the businesses the current user owns or belongs to. All read policies use it.
+- **bookings**: the jobs calendar. Clients have full CRUD on their own rows. The webhook inserts rows with `source = 'elliot'`.
+
+The site and webhook both work **before** this migration is run. The dashboard falls back to the basic columns and shows a notice. The webhook retries a failed save without the new columns.
+
+**Money maths (honest by design):**
+- "Money won" is the sum of `won_value` for leads marked Won, counted by when they were marked Won.
+- "Still in play" is open leads × average job value × conversion rate. It is always labelled as an estimate.
+- "Paid for itself ×" is won ÷ fee for the range: a week is fee ÷ 4.33, a month is the full fee even for a part-month, and all time is fee × whole months since the first call.
+
+**Deliberately not automated yet:** these need an SMS or email provider, so they're one-tap instead.
+- **Follow-ups and review requests** open the phone's SMS app with the message pre-filled (`sms:` links).
+- **The monthly report** is printed or saved as a PDF from the Report tab.
+
+To automate them later, add Twilio (SMS) or Resend (email) and a Netlify scheduled function.
+
+## Let Elliot book jobs (Vapi tools)
+
+The webhook answers two tools. In Vapi, go to **Tools → Create Tool → Function** and create both with:
+- **Server URL:** `https://<your-site>/api/vapi-webhook`
+- **Server secret:** your `VAPI_WEBHOOK_SECRET`
+
+Then add both tools to the assistant.
+
+**1. `check_availability`**. Description: *"Check which start times are free on a given day. Call this before offering times."*
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "date": { "type": "string", "description": "The day to check, as YYYY-MM-DD" },
+    "duration_minutes": { "type": "number", "description": "How long the job takes. Default 60." }
+  },
+  "required": ["date"]
+}
+```
+
+**2. `book_job`**. Description: *"Book a job into the calendar once the caller has agreed a time."*
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "name": { "type": "string" },
+    "phone": { "type": "string" },
+    "address": { "type": "string" },
+    "job": { "type": "string", "description": "Short description of the work" },
+    "start_time": { "type": "string", "description": "Local start time as YYYY-MM-DDTHH:mm, e.g. 2026-09-25T09:00" },
+    "duration_minutes": { "type": "number" },
+    "notes": { "type": "string" }
+  },
+  "required": ["job", "start_time"]
+}
+```
+
+Add this to the assistant's prompt so it uses the right dates:
+
+> Today is {{"now" | date: "%A %d %B %Y", "Australia/Sydney"}}. If the caller wants to book a time, first use check_availability for the day they want and offer up to three of the free times. Once they pick one, use book_job with their name, phone, address, a short job description and the start time in local time (YYYY-MM-DDTHH:mm). Read back the booking confirmation.
+
+Both tools only offer times inside `business_hours` that don't overlap a booked job. Replies are short sentences for Elliot to read out.
+
+**Job type (optional):** add a `job_type` field, such as "Roof leak" or "Gutters", to the Send Text tool arguments or the analysis structured data. The Report's "What people called about" then groups neatly. Without it, the report groups by the `issue` text.

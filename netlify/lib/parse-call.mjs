@@ -16,6 +16,7 @@ const FIELD_ALIASES = {
   details: ['details', 'notes', 'description'],
   urgency: ['urgency', 'urgency_level', 'urgencyLevel'],
   job_value: ['job_value', 'jobValue'],
+  job_type: ['job_type', 'jobType', 'service', 'category', 'job'],
 };
 
 export function normaliseUrgency(value) {
@@ -89,6 +90,9 @@ function fromEndOfCallReport(msg) {
     duration = toSeconds((new Date(endedAt) - new Date(startedAt)) / 1000);
   }
 
+  const artifact = msg.artifact ?? {};
+  const recording = artifact.recording ?? {};
+
   return {
     vapiCallId: clean(call.id),
     assistantId: clean(call.assistantId ?? msg.assistant?.id),
@@ -98,6 +102,11 @@ function fromEndOfCallReport(msg) {
       call_started_at: toIso(startedAt),
       duration_seconds: duration,
       ended_reason: clean(msg.endedReason),
+      recording_url: clean(
+        artifact.recordingUrl ?? recording.mono?.combinedUrl ?? recording.url ?? msg.recordingUrl ?? msg.stereoRecordingUrl,
+      ),
+      transcript: clean(artifact.transcript ?? msg.transcript),
+      summary: clean(msg.analysis?.summary ?? msg.summary),
     },
   };
 }
@@ -111,11 +120,27 @@ function fromFlat(body) {
       ...fields,
       call_started_at: toIso(body.started_at ?? body.startedAt),
       duration_seconds: toSeconds(body.duration_seconds ?? body.durationSeconds),
+      recording_url: clean(body.recording_url ?? body.recordingUrl),
+      transcript: clean(body.transcript),
+      summary: clean(body.summary),
     },
   };
 }
 
-// Returns { ignored } for Vapi message types we don't store, { error } for unusable
+// Vapi "tool-calls" message -> { assistantId, vapiCallId, calls: [{ id, name, args }] }
+export function parseToolCalls(msg) {
+  const list = msg.toolCallList ?? msg.toolCalls ?? msg.toolWithToolCallList?.map((t) => t.toolCall) ?? [];
+  return {
+    assistantId: clean(msg.call?.assistantId ?? msg.assistant?.id),
+    vapiCallId: clean(msg.call?.id),
+    customerNumber: clean(msg.call?.customer?.number),
+    calls: list
+      .map((c) => ({ id: c?.id, name: c?.function?.name ?? c?.name ?? '', args: parseArgs(c?.function?.arguments ?? c?.arguments) ?? {} }))
+      .filter((c) => c.id),
+  };
+}
+
+// Returns { toolCalls } for Vapi tool calls, { ignored } for Vapi message types we don't store, { error } for unusable
 // payloads, or { vapiCallId, assistantId, row } where row holds only known values
 // (so an upsert never blanks out data another message already filled in).
 export function parseWebhook(body) {
@@ -123,6 +148,7 @@ export function parseWebhook(body) {
 
   let parsed;
   if (body.message && typeof body.message === 'object' && body.message.type) {
+    if (body.message.type === 'tool-calls') return { toolCalls: parseToolCalls(body.message) };
     if (body.message.type !== 'end-of-call-report') return { ignored: body.message.type };
     parsed = fromEndOfCallReport(body.message);
   } else {

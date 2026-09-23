@@ -218,6 +218,60 @@ You'll see a page that says **"ElliotAI just needs to link it to your business."
 
 ---
 
+## Part 9 — Switch on the new features · 10 min
+
+This turns on **Leads, Jobs, Customers and Report**. Until you do it, the website still works. It just shows a small blue note at the top.
+
+### Step A: Run the update in Supabase
+
+1. Open this file on GitHub: `supabase/migrations/20260924000000_pro_features.sql`
+2. Click **Copy raw file** (the two small squares, top right).
+3. In **Supabase**, click **SQL Editor** (`>_`), then **+ New query**.
+4. Paste it in and click **Run**. You should see **"Success. No rows returned."** ✅
+
+> Only run this **once**. If you run it a second time you'll see an error saying something "already exists". That's fine. It means it's already done.
+
+### Step B: Fill in the new business details
+
+1. In Supabase, go to **Table Editor**, then **clients**, and find your row.
+2. Fill in these new boxes:
+
+   | Box | What to put |
+   |---|---|
+   | **monthly_fee** | What this client pays you each month, numbers only, like `750`. This powers "Elliot paid for itself 12×". |
+   | **review_url** | Their Google review link. Used by the **Ask for review** button. |
+   | **business_hours** | Leave it as is (Mon–Fri, 7am–5pm). To change it, edit the times. Use `null` for closed days. |
+   | **timezone** | Leave it as `Australia/Sydney` unless they're in another state, e.g. `Australia/Brisbane`, `Australia/Perth`. |
+
+3. Refresh your website. You'll see the tabs at the bottom: **Home, Leads, Jobs, Customers, Report**. 🎉
+
+### Step C (optional): Add a worker's login
+
+1. The worker makes their own account on your `WEBSITE` (**Create an account**).
+2. In Supabase, go to **Table Editor**, then **client_members**, then **Insert row**:
+   - **client_id**: pick the business.
+   - **user_id**: pick the worker's email.
+   - **display_name**: their first name, like `Jake`.
+3. Click **Save**. They can now log in and see the same dashboard, and you can put their name on leads and jobs.
+
+### Step D (optional): Let Elliot book jobs during calls
+
+This lets Elliot check your calendar and book the job while the customer is still on the phone. See **"Let Elliot book jobs"** in [docs/TECHNICAL.md](docs/TECHNICAL.md#let-elliot-book-jobs-vapi-tools). It's a copy-paste job in Vapi.
+
+---
+
+## What each tab does
+
+| Tab | What it's for |
+|---|---|
+| **Home** | Money won, who to call back, and the key numbers at a glance. |
+| **Leads** | Every call. Tap one to hear the recording, read the summary, call or text them, and move it along: **New → Called → Quoted → Won / Lost**. When you tap **Won**, type what the job was worth. That becomes real money on the Home screen. |
+| **Jobs** | Your bookings, day by day. Tap **Book a job**, or book straight from a lead. Jobs Elliot booked say **Booked by Elliot**. |
+| **Customers** | Everyone who's called, with their history. Repeat callers are marked. |
+| **Report** | The monthly summary: money, call-to-job funnel, what people call about, suburbs and busiest times. Tap **Save as PDF** to send it to someone. |
+
+---
+
 ## Something not working?
 
 | Problem | Fix |

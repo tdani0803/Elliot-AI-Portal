@@ -1,277 +1,432 @@
+// Dashboard shell: loads data, switches tabs, and handles every button in one place.
 import '../styles/app.css';
-import { DEMO_MODE, PAGES, supabase } from '../lib/supabase.js';
-import { RANGES, aggregateCalls, rangeStart, summarise } from '../lib/metrics.js';
-import {
-  URGENCY_LABELS,
-  escapeHtml,
-  formatDuration,
-  formatDurationShort,
-  formatMinutes,
-  formatMoney,
-  formatNumber,
-  formatPercent,
-  formatWhen,
-} from '../lib/format.js';
+import { DEMO_MODE, PAGES } from '../lib/supabase.js';
+import { createDataSource } from '../lib/data.js';
+import { RANGES, rangeStart } from '../lib/metrics.js';
+import { callbackList } from '../lib/insights.js';
+import { escapeHtml } from '../lib/format.js';
+import * as home from './tabs/home.js';
+import * as leads from './tabs/leads.js';
+import * as jobs from './tabs/jobs.js';
+import * as customers from './tabs/customers.js';
+import * as report from './tabs/report.js';
 
-const PAGE_SIZE = 25;
-const RANGE_KEY = 'elliotai.range';
+const TABS = { home, leads, jobs, customers, report };
 const $ = (id) => document.getElementById(id);
 
-const state = {
-  range: readSavedRange(),
-  client: null,
-  shown: 0,
+const saved = (key, fallback, allowed) => {
+  try {
+    const value = localStorage.getItem(`elliotai.${key}`);
+    return allowed.includes(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
+};
+const remember = (key, value) => {
+  try {
+    localStorage.setItem(`elliotai.${key}`, value);
+  } catch {
+    /* private mode */
+  }
 };
 
-function readSavedRange() {
-  try {
-    const saved = localStorage.getItem(RANGE_KEY);
-    return RANGES.some((r) => r.id === saved) ? saved : 'week';
-  } catch {
-    return 'week';
-  }
-}
+const state = {
+  client: null,
+  members: [],
+  calls: [],
+  bookings: [],
+  pro: true,
+  range: saved('range', 'week', RANGES.map((r) => r.id)),
+  leadFilter: 'new',
+  leadSearch: '',
+  customerSearch: '',
+  leadLimit: 40,
+  open: new Set(), // which cards are expanded, so re-renders don't collapse them
+  sticky: new Set(), // leads changed on this screen: keep showing them under the current filter
+  transcripts: new Map(),
+};
 
-// ---------------------------------------------------------------------------
-// Data access — Supabase in production, sample data in demo mode.
-// ---------------------------------------------------------------------------
-const data = DEMO_MODE ? await import('../lib/demo.js').then(demoSource) : supabaseSource();
-
-function demoSource({ demoClient, demoCalls }) {
-  return {
-    client: async () => demoClient,
-    stats: async (since) => aggregateCalls(demoCalls, since),
-    calls: async (since, from, to) =>
-      demoCalls.filter((c) => !since || new Date(c.call_started_at) >= since).slice(from, to + 1),
-    onNewCall: () => {},
-  };
-}
-
-function supabaseSource() {
-  return {
-    async client() {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('business_name, avg_job_value, conversion_rate')
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    async stats(since) {
-      const { data, error } = await supabase
-        .rpc('dashboard_stats', { p_since: since ? since.toISOString() : null })
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    async calls(since, from, to) {
-      let query = supabase
-        .from('calls')
-        .select('id, call_started_at, duration_seconds, caller_name, callback_number, address, issue, details, urgency')
-        .order('call_started_at', { ascending: false })
-        .range(from, to);
-      if (since) query = query.gte('call_started_at', since.toISOString());
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
-    },
-    onNewCall(callback) {
-      // RLS applies to realtime too: this only ever fires for the client's own calls.
-      supabase
-        .channel('calls')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'calls' }, callback)
-        .subscribe((status) => {
-          $('live').hidden = status !== 'SUBSCRIBED';
-        });
-    },
-  };
-}
+const data = await createDataSource();
 
 // ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
-function renderRangeButtons() {
-  $('range').innerHTML = RANGES.map(
-    (r) => `<button type="button" data-range="${r.id}" aria-pressed="${r.id === state.range}">${r.label}</button>`,
-  ).join('');
-}
+const currentTab = () => {
+  const tab = location.hash.slice(1);
+  return TABS[tab] ? tab : 'home';
+};
 
-function renderSummary(m) {
-  const rate = formatPercent(m.conversionRate);
-  const rangeLabel = RANGES.find((r) => r.id === state.range).label.toLowerCase();
+function render() {
+  const tab = currentTab();
+  const now = new Date();
+  document.querySelectorAll('[data-tab]').forEach((a) => {
+    if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  });
+  const waiting = state.pro ? callbackList(state.calls, now).length : 0;
+  $('leads-badge').textContent = waiting > 99 ? '99+' : String(waiting);
+  $('leads-badge').hidden = waiting === 0;
 
-  if (m.value == null) {
-    $('value').textContent = '–';
-    $('saved').textContent = "We haven't set your average job value yet — give us a call and we'll add it.";
-    $('fineprint').textContent = '';
-  } else {
-    const value = formatMoney(m.value);
-    $('value').textContent = value;
-    $('saved').innerHTML = `Money saved: <strong>~${value}</strong> — what you'd likely have lost if these calls went unanswered.`;
-    $('fineprint').textContent =
-      `Estimate based on your average job value (${formatMoney(m.avgJobValue)}) and a ${rate} typical conversion rate — not a guarantee.`;
+  const view = $('view');
+  const focused = document.activeElement?.id;
+  view.innerHTML = TABS[tab].render({ state, now, since: rangeStart(state.range, now) });
+  view.querySelectorAll('details[data-id]').forEach((d) => {
+    if (state.open.has(d.dataset.id)) d.open = true;
+  });
+  view.querySelectorAll('[data-transcript]').forEach((el) => {
+    const text = state.transcripts.get(el.dataset.transcript);
+    if (text !== undefined) el.innerHTML = transcriptHtml(text);
+  });
+  if (focused && (focused === 'lead-search' || focused === 'customer-search')) {
+    const input = $(focused);
+    input?.focus();
+    input?.setSelectionRange(input.value.length, input.value.length);
   }
-
-  $('stat-calls').textContent = formatNumber(m.calls);
-  $('stat-leads').textContent = formatNumber(m.leads);
-  $('stat-minutes').textContent = formatMinutes(m.totalSeconds);
-  $('stat-avg').textContent = m.calls ? formatDurationShort(m.avgSeconds) : '–';
-
-  const order = ['urgent', 'somewhat_urgent', 'non_urgent'];
-  const total = order.reduce((sum, key) => sum + m.urgency[key], 0);
-  $('urgency-bar').innerHTML = order
-    .filter((key) => m.urgency[key] > 0)
-    .map((key) => `<span class="urgency__seg urgency__seg--${key}" style="flex:${m.urgency[key]}"></span>`)
-    .join('');
-  $('urgency-bar').setAttribute(
-    'aria-label',
-    total ? order.map((key) => `${URGENCY_LABELS[key]}: ${m.urgency[key]}`).join(', ') : `No leads ${rangeLabel}`,
-  );
-  $('urgency-legend').innerHTML = order
-    .map(
-      (key) => `<li class="urgency__item">
-        <span class="urgency__name"><span class="dot dot--${key}"></span>${URGENCY_LABELS[key]}</span>
-        <span class="urgency__count">${m.urgency[key]}</span>
-      </li>`,
-    )
-    .join('');
+  view.setAttribute('aria-busy', 'false');
 }
 
-function callItem(call) {
-  const urgency = call.urgency ?? 'unknown';
-  const label = URGENCY_LABELS[call.urgency] ?? 'Not tagged';
-  const phone = call.callback_number;
-  const telHref = phone ? `tel:${phone.replace(/[^\d+]/g, '')}` : null;
-  const rows = [
-    ['Call back on', phone ? `<a href="${telHref}">${escapeHtml(phone)}</a>` : 'Not given'],
-    ['Address', escapeHtml(call.address) || 'Not given'],
-    ['What they said', escapeHtml(call.details) || 'No extra details'],
-  ];
-  return `<li>
-    <details class="call">
-      <summary>
-        <span class="call__top">
-          <span class="call__name">${escapeHtml(call.caller_name) || 'Unknown caller'}</span>
-          <span class="pill pill--${urgency}">${label}</span>
-        </span>
-        <span class="call__issue">${escapeHtml(call.issue) || 'No reason given'}</span>
-        <span class="call__meta">
-          <span>${formatWhen(call.call_started_at)}</span>
-          <span>${formatDuration(call.duration_seconds ?? 0)} call</span>
-          <span class="call__more"><span class="call__more-open">Show details ▾</span><span class="call__more-close">Hide ▴</span></span>
-        </span>
-      </summary>
-      <div class="call__body">
-        <dl>${rows.map(([dt, dd]) => `<div><dt>${dt}</dt><dd>${dd}</dd></div>`).join('')}</dl>
-        ${telHref ? `<div class="call__actions"><a class="btn btn--small" href="${telHref}">Call back</a></div>` : ''}
-      </div>
-    </details>
-  </li>`;
+const transcriptHtml = (text) =>
+  text ? `<pre class="transcript__text">${escapeHtml(text)}</pre>` : '<p class="muted">No recording of the conversation for this call.</p>';
+
+let toastTimer;
+function toast(message, isError = false) {
+  const el = $('toast');
+  el.textContent = message;
+  el.classList.toggle('toast--error', isError);
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (el.hidden = true), isError ? 6000 : 2500);
 }
 
-function renderCalls(calls, append) {
-  const list = $('call-list');
-  if (!append) list.innerHTML = '';
-  if (!append && calls.length === 0) {
-    const rangeLabel = RANGES.find((r) => r.id === state.range).label.toLowerCase();
-    list.innerHTML = `<li class="card empty"><strong>No calls ${rangeLabel} yet</strong>
-      When Elliot answers a call, it'll show up here within seconds.</li>`;
-  } else {
-    list.insertAdjacentHTML('beforeend', calls.map(callItem).join(''));
+// ---------------------------------------------------------------------------
+// Saving changes (optimistic: update the screen first, undo if saving fails)
+// ---------------------------------------------------------------------------
+async function updateCall(id, patch, message) {
+  const call = state.calls.find((c) => c.id === id);
+  if (!call) return;
+  const before = { ...call };
+  if (patch.lead_status && patch.lead_status !== call.lead_status) call.status_updated_at = new Date().toISOString();
+  Object.assign(call, patch);
+  render();
+  try {
+    await data.updateCall(id, patch);
+    if (message) toast(message);
+  } catch (err) {
+    console.error(err);
+    Object.assign(call, before);
+    render();
+    toast("Couldn't save that. Check your internet and try again.", true);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Booking form
+// ---------------------------------------------------------------------------
+const pad = (n) => String(n).padStart(2, '0');
+const dateValue = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const timeValue = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+function openBooking(prefill = {}) {
+  const form = $('booking-form');
+  form.reset();
+  $('booking-error').hidden = true;
+  const start = prefill.starts_at ? new Date(prefill.starts_at) : (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(8, 0, 0, 0);
+    return d;
+  })();
+  form.booking_id.value = prefill.id ?? '';
+  form.call_id.value = prefill.call_id ?? '';
+  form.job.value = prefill.job ?? '';
+  form.date.value = dateValue(start);
+  form.time.value = timeValue(start);
+  form.duration_minutes.value = String(prefill.duration_minutes ?? 60);
+  form.customer_name.value = prefill.customer_name ?? '';
+  form.phone.value = prefill.phone ?? '';
+  form.address.value = prefill.address ?? '';
+  form.notes.value = prefill.notes ?? '';
+  $('b-assign-field').hidden = state.members.length === 0;
+  $('b-assign').innerHTML = `<option value="">Nobody yet</option>${state.members
+    .map((m) => `<option ${m.display_name === prefill.assigned_to ? 'selected' : ''}>${escapeHtml(m.display_name)}</option>`)
+    .join('')}`;
+  $('booking-title').textContent = prefill.id ? 'Edit job' : 'Book a job';
+  $('booking-extra').hidden = !prefill.id;
+  $('booking-cancel-job').hidden = !prefill.id || prefill.status === 'cancelled';
+  $('booking-dialog').showModal();
+  form.job.focus();
+}
+
+async function saveBooking(fields, message) {
+  const payload = { client_id: state.client.id, ...fields };
+  const savedRow = await data.saveBooking(payload);
+  const i = state.bookings.findIndex((b) => b.id === savedRow.id);
+  if (i >= 0) state.bookings[i] = savedRow;
+  else state.bookings.push(savedRow);
+  render();
+  toast(message);
+}
+
+$('booking-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  if (!form.job.value.trim() || !form.date.value || !form.time.value) {
+    $('booking-error').textContent = 'Add the job, the day and a start time.';
+    $('booking-error').hidden = false;
+    return;
+  }
+  const submit = form.querySelector('[type="submit"]');
+  submit.disabled = true;
+  try {
+    const clean = (v) => v.trim() || null;
+    await saveBooking(
+      {
+        ...(form.booking_id.value ? { id: form.booking_id.value } : {}),
+        ...(form.call_id.value ? { call_id: form.call_id.value } : {}),
+        job: form.job.value.trim(),
+        starts_at: new Date(`${form.date.value}T${form.time.value}`).toISOString(),
+        duration_minutes: Number(form.duration_minutes.value),
+        customer_name: clean(form.customer_name.value),
+        phone: clean(form.phone.value),
+        address: clean(form.address.value),
+        assigned_to: clean(form.assigned_to.value),
+        notes: clean(form.notes.value),
+      },
+      form.booking_id.value ? 'Job updated' : 'Job booked ✅',
+    );
+    $('booking-dialog').close();
+  } catch (err) {
+    console.error(err);
+    $('booking-error').textContent = "Couldn't save the job. Check your internet and try again.";
+    $('booking-error').hidden = false;
+  } finally {
+    submit.disabled = false;
+  }
+});
+
+$('booking-dialog').addEventListener('click', (event) => {
+  if (event.target.closest('[data-close]') || event.target === $('booking-dialog')) $('booking-dialog').close();
+});
+
+$('booking-cancel-job').addEventListener('click', async () => {
+  const id = $('booking-form').booking_id.value;
+  if (!id || !confirm('Cancel this job?')) return;
+  try {
+    await saveBooking({ id, status: 'cancelled' }, 'Job cancelled');
+    $('booking-dialog').close();
+  } catch {
+    toast("Couldn't cancel the job. Try again.", true);
+  }
+});
+
+$('booking-delete').addEventListener('click', async () => {
+  const id = $('booking-form').booking_id.value;
+  if (!id || !confirm('Delete this job for good?')) return;
+  try {
+    await data.deleteBooking(id);
+    state.bookings = state.bookings.filter((b) => b.id !== id);
+    $('booking-dialog').close();
+    render();
+    toast('Job deleted');
+  } catch {
+    toast("Couldn't delete the job. Try again.", true);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Every button / input on the page, handled in one place
+// ---------------------------------------------------------------------------
+const actions = {
+  'set-range'(el) {
+    state.range = el.dataset.range;
+    remember('range', state.range);
+    render();
+  },
+  'mark-called'(el) {
+    // From Home: the item drops off the to-do list, which is the point.
+    updateCall(el.dataset.id, { lead_status: 'called_back' }, 'Marked as called back');
+  },
+  'set-status'(el) {
+    const { id, status } = el.dataset;
+    const call = state.calls.find((c) => c.id === id);
+    if (!call || call.lead_status === status) return;
+    state.open.add(id);
+    state.sticky.add(id);
+    const message = { won: 'Nice one! 🎉 Add what the job was worth.', lost: 'Marked as lost' }[status] ?? 'Saved';
+    updateCall(id, { lead_status: status }, message);
+    if (status === 'won') setTimeout(() => $(`won-${id}`)?.focus(), 50);
+  },
+  'lead-filter'(el) {
+    state.leadFilter = el.dataset.filter;
+    state.sticky.clear();
+    state.leadLimit = 40;
+    render();
+  },
+  'more-leads'() {
+    state.leadLimit += 40;
+    render();
+  },
+  'book-from-lead'(el) {
+    const call = state.calls.find((c) => c.id === el.dataset.id);
+    openBooking({
+      call_id: call.id,
+      job: call.issue ?? '',
+      customer_name: call.caller_name ?? '',
+      phone: call.callback_number ?? '',
+      address: call.address ?? '',
+      notes: call.details ?? '',
+      assigned_to: call.assigned_to,
+    });
+  },
+  'new-booking'() {
+    openBooking();
+  },
+  'edit-booking'(el) {
+    openBooking(state.bookings.find((b) => b.id === el.dataset.id));
+  },
+  async 'booking-done'(el) {
+    try {
+      await saveBooking({ id: el.dataset.id, status: 'done' }, 'Job marked done ✅');
+    } catch {
+      toast("Couldn't update the job. Try again.", true);
+    }
+  },
+  async 'load-transcript'(el) {
+    const id = el.dataset.id;
+    el.disabled = true;
+    el.textContent = 'Loading…';
+    try {
+      state.transcripts.set(id, await data.transcript(id));
+    } catch {
+      state.transcripts.delete(id);
+      toast("Couldn't load the conversation. Try again.", true);
+    }
+    render();
+  },
+  print() {
+    window.print();
+  },
+};
+
+$('view').addEventListener('click', (event) => {
+  const el = event.target.closest('[data-action]');
+  if (!el || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.tagName === 'FORM') return;
+  actions[el.dataset.action]?.(el);
+});
+
+$('view').addEventListener('submit', (event) => {
+  const form = event.target.closest('form[data-action="save-won"]');
+  if (!form) return;
+  event.preventDefault();
+  const raw = form.value.value.trim();
+  const value = raw === '' ? null : Math.max(0, Math.round(Number(raw)));
+  if (raw !== '' && !Number.isFinite(value)) return toast('Type the amount as a number, like 2500.', true);
+  updateCall(form.dataset.id, { won_value: value }, value ? 'Job value saved 💰' : 'Job value cleared');
+});
+
+$('view').addEventListener('change', (event) => {
+  const el = event.target;
+  if (el.dataset.action === 'assign') updateCall(el.dataset.id, { assigned_to: el.value || null }, el.value ? `Given to ${el.value}` : 'Unassigned');
+  if (el.dataset.action === 'save-notes') {
+    const call = state.calls.find((c) => c.id === el.dataset.id);
+    const notes = el.value.trim() || null;
+    if (call && (call.notes ?? null) !== notes) updateCall(el.dataset.id, { notes }, 'Note saved');
+  }
+});
+
+$('view').addEventListener('input', (event) => {
+  const el = event.target;
+  if (el.dataset.action === 'search-leads') {
+    state.leadSearch = el.value;
+    state.leadLimit = 40;
+    render();
+  }
+  if (el.dataset.action === 'search-customers') {
+    state.customerSearch = el.value;
+    render();
+  }
+});
+
+// Remember which cards are open so saving a change doesn't snap them shut.
+$('view').addEventListener(
+  'toggle',
+  (event) => {
+    const id = event.target.dataset?.id;
+    if (!id) return;
+    if (event.target.open) state.open.add(id);
+    else state.open.delete(id);
+  },
+  true,
+);
+
+window.addEventListener('hashchange', () => {
+  state.sticky.clear();
+  render();
+  window.scrollTo(0, 0);
+});
 
 // ---------------------------------------------------------------------------
 // Loading
 // ---------------------------------------------------------------------------
-async function load() {
-  const page = $('page');
-  page.classList.add('loading');
-  page.setAttribute('aria-busy', 'true');
-  const since = rangeStart(state.range);
-  try {
-    const [stats, calls] = await Promise.all([data.stats(since), data.calls(since, 0, PAGE_SIZE - 1)]);
-    renderSummary(summarise(stats, state.client));
-    renderCalls(calls, false);
-    state.shown = calls.length;
-    $('more').hidden = calls.length < PAGE_SIZE;
-  } catch (err) {
-    console.error(err);
-    $('call-list').innerHTML =
-      '<li class="card empty"><strong>Couldn\'t load your calls</strong>Check your internet and refresh the page.</li>';
-  } finally {
-    page.classList.remove('loading');
-    page.setAttribute('aria-busy', 'false');
-  }
-}
-
-async function loadMore() {
-  const button = $('more');
-  button.disabled = true;
-  try {
-    const calls = await data.calls(rangeStart(state.range), state.shown, state.shown + PAGE_SIZE - 1);
-    renderCalls(calls, true);
-    state.shown += calls.length;
-    button.hidden = calls.length < PAGE_SIZE;
-  } finally {
-    button.disabled = false;
-  }
+async function loadAll() {
+  const [calls, bookings, members] = await Promise.all([data.calls(), data.bookings(), data.members()]);
+  state.calls = calls;
+  state.bookings = bookings;
+  state.members = members;
+  state.pro = data.pro;
 }
 
 let reloadTimer;
 function scheduleReload() {
   clearTimeout(reloadTimer);
-  reloadTimer = setTimeout(load, 800); // a call's details can arrive as two quick updates
+  reloadTimer = setTimeout(async () => {
+    try {
+      await loadAll();
+      render();
+    } catch (err) {
+      console.error(err);
+    }
+  }, 800);
+}
+
+function showUnlinked() {
+  $('view').innerHTML = `<section class="hello">
+      <h1 class="hello__business">Almost there</h1>
+      <p class="hello__sub">Your account is made. ElliotAI just needs to link it to your business. Once that's done, your calls show up here.</p>
+    </section>`;
+  $('view').setAttribute('aria-busy', 'false');
 }
 
 async function start() {
-  if (DEMO_MODE) {
-    $('demo-banner').hidden = false;
-  } else {
-    const { data: session } = await supabase.auth.getSession();
-    if (!session.session) return location.replace(PAGES.login);
-  }
+  if (DEMO_MODE) $('demo-banner').hidden = false;
+  else if (!(await data.hasSession())) return location.replace(PAGES.login);
 
   try {
     state.client = await data.client();
   } catch (err) {
     console.error(err);
   }
-  if (!state.client) {
-    $('business').textContent = 'Almost there';
-    document.querySelector('.hello__sub').textContent =
-      "Your account is made. ElliotAI just needs to link it to your business. Once that's done, your calls show up here.";
-    document.querySelectorAll('.range, .hero, .stats, .urgency, .calls').forEach((el) => (el.hidden = true));
-    $('page').setAttribute('aria-busy', 'false');
+  if (!state.client) return showUnlinked();
+
+  try {
+    await loadAll();
+  } catch (err) {
+    console.error(err);
+    $('view').innerHTML = `<div class="card empty"><strong>Couldn't load your calls</strong>Check your internet and refresh the page.</div>`;
     return;
   }
+  $('upgrade-banner').hidden = state.pro;
+  $('tabbar').hidden = false;
+  render();
 
-  $('business').textContent = state.client.business_name;
-  renderRangeButtons();
-  await load();
-
-  $('range').addEventListener('click', (event) => {
-    const range = event.target.closest('button')?.dataset.range;
-    if (!range || range === state.range) return;
-    state.range = range;
-    try {
-      localStorage.setItem(RANGE_KEY, range);
-    } catch {
-      /* private mode — not important */
-    }
-    renderRangeButtons();
-    load();
-  });
-  $('more').addEventListener('click', loadMore);
-  data.onNewCall(scheduleReload);
-  // Tradies flick between apps: refresh whenever they come back to the tab.
+  data.subscribe(scheduleReload);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') scheduleReload();
   });
 }
 
 $('logout').addEventListener('click', async () => {
-  if (!DEMO_MODE) await supabase.auth.signOut();
+  await data.signOut();
   location.replace(PAGES.login);
 });
 

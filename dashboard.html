@@ -30,66 +30,59 @@
 </head>
 <body>
   <div class="demo-banner" id="demo-banner" hidden>Demo mode — showing sample data</div>
+  <div class="upgrade-banner" id="upgrade-banner" hidden>New features (leads, jobs, customers) switch on once ElliotAI finishes a quick update.</div>
   <header class="topbar">
     <img class="topbar__logo" src="/logo.png" alt="ElliotAI" width="150" height="38" />
     <button class="btn btn--ghost btn--small" id="logout" type="button">Log out</button>
   </header>
 
-  <main class="page" id="page" aria-busy="true">
-    <section class="hello">
-      <h1 class="hello__business" id="business">&nbsp;</h1>
-      <p class="hello__sub">Here's what your AI receptionist handled for you.</p>
-    </section>
+  <nav class="tabbar" id="tabbar" aria-label="Sections" hidden>
+    <a href="#home" data-tab="home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7v9h-6v-6H9v6H3z"/></svg><span>Home</span></a>
+    <a href="#leads" data-tab="leads"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg><span>Leads</span><b class="tabbar__badge" id="leads-badge" hidden></b></a>
+    <a href="#jobs" data-tab="jobs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5"/></svg><span>Jobs</span></a>
+    <a href="#customers" data-tab="customers"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6"/></svg><span>Customers</span></a>
+    <a href="#report" data-tab="report"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Report</span></a>
+  </nav>
 
-    <div class="range" role="group" aria-label="Date range" id="range"></div>
-
-    <section class="card hero" aria-labelledby="hero-label">
-      <span class="hero__label" id="hero-label">Estimated value captured</span>
-      <span class="hero__value" id="value">–</span>
-      <p class="hero__saved" id="saved"></p>
-      <p class="hero__fineprint" id="fineprint"></p>
-    </section>
-
-    <section class="stats" aria-label="Call numbers">
-      <div class="card stat">
-        <span class="stat__label">Calls handled</span>
-        <span class="stat__value" id="stat-calls">–</span>
-        <span class="stat__hint">Answered by Elliot</span>
-      </div>
-      <div class="card stat">
-        <span class="stat__label">Leads captured</span>
-        <span class="stat__value" id="stat-leads">–</span>
-        <span class="stat__hint">Real jobs, not spam</span>
-      </div>
-      <div class="card stat">
-        <span class="stat__label">Call minutes</span>
-        <span class="stat__value" id="stat-minutes">–</span>
-        <span class="stat__hint">Time off your phone</span>
-      </div>
-      <div class="card stat">
-        <span class="stat__label">Avg call length</span>
-        <span class="stat__value" id="stat-avg">–</span>
-        <span class="stat__hint">Per call</span>
-      </div>
-    </section>
-
-    <section class="card urgency" aria-labelledby="urgency-title">
-      <h2 class="section-title" id="urgency-title">How urgent were they?</h2>
-      <div class="urgency__bar" id="urgency-bar" role="img"></div>
-      <ul class="urgency__legend" id="urgency-legend"></ul>
-    </section>
-
-    <section class="calls" aria-labelledby="calls-title">
-      <div class="calls__head">
-        <h2 class="section-title" id="calls-title">Recent calls</h2>
-        <span class="calls__live" id="live" hidden>Live</span>
-      </div>
-      <ul class="call-list" id="call-list"></ul>
-      <button class="btn btn--ghost btn--block" id="more" type="button" hidden>Show more calls</button>
-    </section>
-
-    <p class="footer-note">Need something changed? Just call or text us — we'll sort it.</p>
+  <main class="page" id="view" aria-busy="true" aria-live="polite">
+    <p class="muted center">Loading…</p>
   </main>
+
+  <dialog class="sheet" id="booking-dialog" aria-labelledby="booking-title">
+    <form class="sheet__form" id="booking-form" method="dialog">
+      <h2 class="section-title" id="booking-title">Book a job</h2>
+      <input type="hidden" name="booking_id" />
+      <input type="hidden" name="call_id" />
+      <div class="field"><label for="b-job">What's the job?</label><input id="b-job" name="job" required placeholder="e.g. Fix roof leak" /></div>
+      <div class="field-row">
+        <div class="field"><label for="b-date">Day</label><input id="b-date" name="date" type="date" required /></div>
+        <div class="field"><label for="b-time">Start</label><input id="b-time" name="time" type="time" required step="900" /></div>
+      </div>
+      <div class="field"><label for="b-duration">How long?</label>
+        <select id="b-duration" name="duration_minutes">
+          <option value="30">30 min</option><option value="60" selected>1 hour</option><option value="120">2 hours</option>
+          <option value="180">3 hours</option><option value="240">4 hours</option><option value="480">All day</option>
+        </select>
+      </div>
+      <div class="field"><label for="b-name">Customer</label><input id="b-name" name="customer_name" autocomplete="off" /></div>
+      <div class="field"><label for="b-phone">Phone</label><input id="b-phone" name="phone" type="tel" autocomplete="off" /></div>
+      <div class="field"><label for="b-address">Address</label><input id="b-address" name="address" autocomplete="off" /></div>
+      <div class="field" id="b-assign-field" hidden><label for="b-assign">Who's doing it?</label><select id="b-assign" name="assigned_to"></select></div>
+      <div class="field"><label for="b-notes">Notes</label><textarea id="b-notes" name="notes" rows="2"></textarea></div>
+      <p class="notice notice--error" id="booking-error" role="alert" hidden></p>
+      <div class="sheet__actions">
+        <button class="btn" type="submit" value="save">Save job</button>
+        <button class="btn btn--ghost" type="button" data-close>Cancel</button>
+      </div>
+      <div class="sheet__extra" id="booking-extra" hidden>
+        <button class="link-button" type="button" id="booking-cancel-job">Cancel this job</button>
+        <button class="link-button link-button--danger" type="button" id="booking-delete">Delete</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+
   <script type="module" src="/src/pages/dashboard.js"></script>
 </body>
 </html>
