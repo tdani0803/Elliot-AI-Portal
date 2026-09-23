@@ -61,7 +61,8 @@ async function saveCall(clientId, vapiCallId, row) {
 async function alertSafely(vapiCallId) {
   try {
     const result = await alertIfNewLead(vapiCallId);
-    if (!result.skipped) console.log('vapi-webhook: lead alert', JSON.stringify(result));
+    // e.g. {"phones":1,"delivered":1,"texted":false} or {"skipped":"..."} — check this line when a buzz doesn't arrive.
+    console.log('vapi-webhook: lead alert', JSON.stringify(result));
   } catch (err) {
     console.error('vapi-webhook: lead alert failed', err);
   }

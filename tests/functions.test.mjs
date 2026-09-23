@@ -149,3 +149,17 @@ test('caller details match loosely: capitals, spaces, one output per field, summ
   assert.equal(b.urgency, 'urgent');
   assert.equal(b.issue, 'The caller reported water coming through the kitchen ceiling after the storm.');
 });
+
+test('true/false answers from yes/no fields are ignored, so the summary fills the reason', async () => {
+  const { parseWebhook } = await import('../netlify/lib/parse-call.mjs');
+  const { row } = parseWebhook({
+    message: {
+      type: 'end-of-call-report',
+      call: { id: 'c5', assistantId: 'a1' },
+      analysis: { structuredData: { name: 'Kim', issue: true, details: 'false' }, summary: 'Caller wants gutters cleaned. Not urgent.' },
+    },
+  });
+  assert.equal(row.caller_name, 'Kim');
+  assert.equal(row.issue, 'Caller wants gutters cleaned.');
+  assert.equal(row.details, undefined);
+});

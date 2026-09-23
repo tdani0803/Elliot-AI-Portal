@@ -98,12 +98,12 @@ test('alertIfNewLead: claims once, pushes, and texts only when no phone got it',
   assert.equal(params.get('To'), '+61412345678');
   assert.match(params.get('Body'), /^URGENT – New lead: Sarah Mitchell/);
   const claim = log.find((l) => l.url.includes('calls?vapi_call_id'));
-  assert.match(decodeURIComponent(claim.url), /notified_at=is\.null&urgency=in\.\(urgent,somewhat_urgent,non_urgent\)/);
+  assert.match(decodeURIComponent(claim.url), /notified_at=is\.null&or=\(urgency\.in\.\(urgent,somewhat_urgent,non_urgent\),and\(urgency\.is\.null,duration_seconds\.gte\.15\)\)/);
 });
 
 test('alertIfNewLead skips spam / already-alerted calls and old databases', async () => {
   fake({ 'calls?vapi_call_id': () => [200, []] });
-  assert.deepEqual(await alertIfNewLead('vapi-1'), { skipped: 'not a new lead' });
+  assert.match((await alertIfNewLead('vapi-1')).skipped, /^not a new lead/);
   fake({ 'calls?vapi_call_id': () => [400, { message: 'column calls.notified_at does not exist' }] });
   assert.deepEqual(await alertIfNewLead('vapi-1'), { skipped: 'alerts migration not run' });
 });
@@ -127,4 +127,8 @@ test('buildIcs makes a valid, escaped calendar feed', () => {
   assert.match(ics, /UID:b2@elliotai[\s\S]*STATUS:CANCELLED/);
   const long = fold(`DESCRIPTION:${'x'.repeat(200)}`);
   assert.ok(long.split('\r\n').every((line) => Buffer.byteLength(line) <= 75));
+});
+
+test('calls without an urgency still get a notification titled "New call"', () => {
+  assert.equal(buildNotification({ ...call, urgency: null }, client).title, 'New call: Sarah Mitchell');
 });

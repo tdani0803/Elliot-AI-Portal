@@ -54,7 +54,9 @@ function pickFields(source) {
   if (!source || typeof source !== 'object') return out;
   const byKey = new Map();
   for (const [key, value] of Object.entries(source)) {
-    const text = typeof value === 'object' ? null : clean(value);
+    // Yes/no (boolean) answers aren't details — a field set up as true/false in Vapi would
+    // otherwise show "true" as the caller's reason.
+    const text = typeof value === 'object' || typeof value === 'boolean' || /^(true|false)$/i.test(String(value).trim()) ? null : clean(value);
     if (text != null && !byKey.has(normKey(key))) byKey.set(normKey(key), text);
   }
   const used = new Set();

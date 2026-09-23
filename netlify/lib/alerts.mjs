@@ -19,6 +19,9 @@ const URGENCY_TITLE = {
   somewhat_urgent: 'New lead (somewhat urgent)',
   non_urgent: 'New lead (not urgent)',
 };
+// Calls where Vapi didn't give an urgency still alert (better an extra buzz than a missed job),
+// as long as the caller stayed on the line long enough to be a real enquiry.
+const MIN_SECONDS_WITHOUT_URGENCY = 15;
 
 // The lock-screen notification. Suburb only (not the full address) — lock screens are public.
 export function buildNotification(call, client) {
@@ -27,7 +30,7 @@ export function buildNotification(call, client) {
   const what = [call.issue?.trim() || 'No reason given', suburb].filter(Boolean).join(', ');
   const promise = promisePhrase(promiseMinutes(call.urgency, client));
   return {
-    title: `${URGENCY_TITLE[call.urgency] ?? 'New lead'}: ${name}`,
+    title: `${URGENCY_TITLE[call.urgency] ?? 'New call'}: ${name}`,
     body: `Elliot just answered a call. ${what}. We told them you'd call back ${promise}.`,
     url: `/dashboard.html#leads/${call.id}`,
     tag: `lead-${call.id}`,
@@ -118,7 +121,9 @@ export async function alertIfNewLead(vapiCallId, deps = {}) {
   let claimed;
   try {
     claimed = await restJson(
-      `calls?vapi_call_id=eq.${encodeURIComponent(vapiCallId)}&notified_at=is.null&urgency=in.(${LEAD_URGENCIES.join(',')})&select=${CALL_FIELDS}`,
+      `calls?vapi_call_id=eq.${encodeURIComponent(vapiCallId)}&notified_at=is.null` +
+        `&or=(urgency.in.(${LEAD_URGENCIES.join(',')}),and(urgency.is.null,duration_seconds.gte.${MIN_SECONDS_WITHOUT_URGENCY}))` +
+        `&select=${CALL_FIELDS}`,
       { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ notified_at: new Date().toISOString() }) },
     );
   } catch (err) {
@@ -126,7 +131,7 @@ export async function alertIfNewLead(vapiCallId, deps = {}) {
     throw err;
   }
   const call = claimed?.[0];
-  if (!call) return { skipped: 'not a new lead' };
+  if (!call) return { skipped: 'not a new lead (spam, too short, or already alerted)' };
 
   const [client] = await restJson(
     `clients?id=eq.${call.client_id}&select=business_name,callback_urgent_minutes,callback_standard_minutes,alert_phone,sms_backup`,
