@@ -98,6 +98,8 @@ Add these **5** settings. Type the name **exactly** as shown, with capital lette
 
 Then click **Deploy**.
 
+> ⚠️ **Added these settings after the site was already made?** Then you must rebuild it: **Deploys → Trigger deploy → Deploy site**. See Part 3.
+
 ### Step 7: Get your website address
 
 1. Wait about 1 minute until it says **Published**.
@@ -118,60 +120,88 @@ This makes the "forgot password" and invite emails send people to the right plac
 
 ---
 
-## Part 3 — Connect Vapi (your AI receptionist) · 5 min
+## Part 3 — Make sure the website works · 5 min
 
-Do this once for **each** client's assistant in Vapi.
+Do this first. The website needs to be rebuilt **after** you add the 5 settings from Step 6.
 
-1. Log in to [Vapi](https://dashboard.vapi.ai) and open the client's **assistant**.
-2. Find the assistant's **ID**. It's a long code near the assistant's name at the top. Click it to copy.
-   Put it in your notes, like `ACME ROOFING ASSISTANT ID`.
-3. Look for **Server URL**. It's usually in the **Advanced** tab, in a section called **Server** or **Messaging**.
-4. Set **Server URL** to your `WEBSITE` with `/api/vapi-webhook` on the end. For example:
-   `https://elliotai-portal.netlify.app/api/vapi-webhook`
-5. In the **Secret** box next to it (it might be called **Server Secret** or **Secret Token**), paste your `VAPI SECRET`.
-6. Make sure **End of Call Report** is ticked in the list of server messages. It usually is already.
-7. Click **Publish** or **Save**.
+1. Go to **Netlify** and open your site.
+2. Click **Deploys** on the left.
+3. Click **Trigger deploy**, then **Deploy site**.
+4. Wait until the top one says **Published** (about 1 minute).
+5. Open your `WEBSITE`.
+
+**Did a pink box appear that says "Setup problem"?**
+- **Yes:** one of the 5 settings in Step 6 is spelled wrong or is missing. Fix it, then do steps 2–4 again.
+- **No:** great, the website is working. ✅
+
+> **Good to know:** there's no "sign up" on the website, and that's on purpose. Clients can't make their own account. You invite them in Part 4.
 
 ---
 
-## Part 4 — Add your first client · 5 min
+## Part 4 — Log in for the first time · 5 min
 
-Do these steps every time you sign up a new tradie.
+We'll make **you** the first client so you can test everything.
 
-### Step A: Invite them
+### Step A: Check your invite
 
-1. In **Supabase**, click **Authentication → Users**.
-2. Click **Add user**, then **Send invitation**.
-3. Type the client's email and click **Invite**.
-   They get an email. When they click it, they choose their own password.
+You already sent yourself an invite. That link has probably been used up, so do this instead:
 
-### Step B: Add their business details
+1. Open your `WEBSITE`.
+2. Click **Forgot password?**.
+3. Type your email and click **Send reset link**.
+4. Open the email and click the link.
+5. Type a new password twice and click **Save password**.
+
+> **No email arrived?** Check your junk folder. Still nothing? In **Supabase → Authentication → Users**, check your email is in the list. If it isn't, click **Add user → Send invitation** and invite yourself again.
+
+### Step B: Link your login to a business
 
 1. In Supabase, click **Table Editor** on the left (it looks like a grid).
 2. Click the **clients** table.
 3. Click **Insert**, then **Insert row**.
-4. Fill in the boxes:
-   - **user_id:** click the box, then pick the email you just invited.
-   - **business_name:** their business name, for example `Acme Roofing`.
-   - **avg_job_value:** their average job in dollars, numbers only. For example `2500`.
-   - **conversion_rate:** leave it as `0.3`. That means 30%.
-   - **vapi_assistant_id:** paste their assistant ID from Part 3.
-   - Leave every other box empty.
-5. Click **Save**. ✅
+4. Fill in these boxes:
+   - **user_id:** click it and pick your email.
+   - **business_name:** a business name, like `Test Roofing`.
+   - **avg_job_value:** a number, like `2500`.
+   - Leave every other box alone for now.
+5. Click **Save**.
+6. Go back to your `WEBSITE` and refresh the page.
 
-> Want to change a client's details later, like their average job value? Come back to this table, click on the box, type the new number and press **Enter**.
+You should now see your dashboard with your business name at the top. It will be empty, and that's normal. ✅
 
 ---
 
-## Part 5 — Test it! · 5 min
+## Part 5 — Connect Vapi · 5 min
 
-1. Invite **yourself** as a test client (Part 4), using your own email.
-2. Open the invite email and click the link. Choose a password.
-3. You should now see your dashboard. It will be empty for now. That's normal.
-4. **Call your AI receptionist** from your phone and pretend to be a customer with a job.
-5. Hang up. Within about 10 seconds, the call appears on your dashboard. 🎉
+This makes calls show up on the dashboard.
 
-If it doesn't show up, check the list below.
+### Step A: Copy the assistant's ID
+
+1. Log in to [Vapi](https://dashboard.vapi.ai) and open your **assistant**.
+2. Find the assistant's **ID**. It's a long code near the name at the top. Click it to copy.
+3. In **Supabase → Table Editor → clients**, click the **vapi_assistant_id** box on your row.
+4. Paste the ID and press **Enter**.
+
+### Step B: Tell Vapi where to send calls
+
+1. Back in Vapi, on your assistant, look for **Server URL**. Try the **Advanced** tab.
+2. Paste your `WEBSITE` with `/api/vapi-webhook` on the end. For example:
+   `https://elliotai-portal.netlify.app/api/vapi-webhook`
+3. Find the **Secret** box near it. It might be called **Server Secret**, **Secret Token** or **Credential**.
+   Paste your `VAPI SECRET`.
+4. Click **Publish** or **Save**.
+
+> **Can't find the Secret box?** Take a screenshot of the page and send it over, and we'll find it together. Without the secret, calls won't show up.
+
+---
+
+## Part 6 — Test call · 2 min
+
+1. **Call your AI receptionist** and pretend to be a customer with a job.
+2. Hang up. Wait about 10 seconds.
+3. Refresh your dashboard. The call is there. 🎉 **You're done!**
+
+From now on, to add a real client, repeat **Part 4** (using **Add user → Send invitation** for their email) and **Part 5** with their assistant.
 
 ---
 
@@ -182,7 +212,9 @@ If it doesn't show up, check the list below.
 | The website shows a blank white page | In Netlify, check that all 5 names in Step 6 are spelled **exactly** right. Then go to **Deploys → Trigger deploy → Deploy site**. |
 | "That email and password don't match" | Click **Forgot password?** on the login page to make a new password. |
 | The invite or reset link says "expired" | Links only work once and only for a short time. Send a new invite, or use **Forgot password?**. |
-| "Your account isn't linked to a business yet" | You haven't done Part 4 Step B, or you picked the wrong **user_id**. |
+| "Your account isn't linked to a business yet" | Do Part 4 Step B. Make sure you picked the right email in **user_id**. |
+| The buttons do nothing, or a pink "Setup problem" box appears | Do Part 3. |
+| The email link opens a page that won't load, or says `localhost` | Do Step 8 (Site URL and Redirect URLs in Supabase). Then ask for a new link. |
 | A call doesn't show up | 1. Check the Vapi **Server URL** ends in `/api/vapi-webhook`. 2. Check the Vapi secret matches `VAPI_WEBHOOK_SECRET` in Netlify **exactly**. 3. Check the **vapi_assistant_id** in Supabase matches the assistant's ID in Vapi. |
 | I want to see what went wrong | In Netlify, go to **Logs → Functions → vapi-webhook**. Errors show up there. |
 
@@ -197,7 +229,7 @@ Want clients to log in at `portal.elliotai.com.au`?
 3. Wait up to 1 hour for it to start working.
 4. Then **update your address everywhere you used it:**
    - In Supabase, change the **Site URL** and **Redirect URLs** (Step 8).
-   - In Vapi, change the **Server URL** for each assistant (Part 3).
+   - In Vapi, change the **Server URL** for each assistant (Part 5).
 
 ---
 
