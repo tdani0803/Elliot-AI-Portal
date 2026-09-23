@@ -1,5 +1,5 @@
 // Gives the browser the public key it needs to turn on notifications.
-import { hasSupabaseEnv } from '../lib/rest.mjs';
+import { hasSupabaseEnv, keyFingerprint } from '../lib/rest.mjs';
 import { getVapidKeys } from '../lib/vapid.mjs';
 
 export default async () => {
@@ -14,7 +14,7 @@ export default async () => {
     const reason = /app_secrets/.test(message) && /does not exist|not find/i.test(message)
       ? 'The alerts database update (20260925000000_alerts.sql) has not been run yet.'
       : /401|403|Invalid API key|JWT/i.test(message)
-        ? `The server could not log in to Supabase. Check SUPABASE_SERVICE_ROLE_KEY in Netlify. (Supabase said: ${message.replace(/^Supabase /, '').slice(0, 120)})`
+        ? `Supabase rejected the key: ${keyFingerprint()}. Compare it with the secret key in Supabase → Project Settings → API Keys.`
         : message.slice(0, 200);
     return Response.json({ error: 'Notifications are not set up yet', reason }, { status: 503 });
   }

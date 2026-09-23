@@ -99,3 +99,26 @@ test('newer Vapi "Structured Outputs" are read too', async () => {
   assert.equal(row.caller_name, 'Jo');
   assert.equal(row.urgency, 'urgent');
 });
+
+test('service key is tidied and fingerprinted without revealing it', async () => {
+  const { serviceKey, keyFingerprint } = await import('../netlify/lib/rest.mjs');
+  process.env.SUPABASE_SERVICE_ROLE_KEY = ' "sb_secret_abcdefghijklmnop" \n';
+  assert.equal(serviceKey(), 'sb_secret_abcdefghijklmnop');
+  assert.equal(keyFingerprint(), 'the key in Netlify is a secret key, starts "sb_secret_abc…" and is 26 characters long');
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'SUPABASE_SERVICE_ROLE_KEY=sb_publishable_xyz';
+  assert.match(keyFingerprint(), /PUBLISHABLE key/);
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key';
+});
+
+test('rest retries with the other header style after a 401', async () => {
+  const { rest } = await import('../netlify/lib/rest.mjs');
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'sb_secret_abc';
+  const seen = [];
+  globalThis.fetch = async (url, init) => {
+    seen.push(Boolean(init.headers.Authorization));
+    return new Response('[]', { status: seen.length === 1 ? 401 : 200 });
+  };
+  await rest('clients?select=id');
+  assert.deepEqual(seen, [false, true]);
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key';
+});
