@@ -6,19 +6,11 @@
   display: grid;
   place-items: center;
   padding: 24px 16px;
-  background:
-    radial-gradient(circle at 15% 10%, var(--sky-soft) 0 180px, transparent 181px),
-    radial-gradient(circle at 90% 95%, var(--sky-soft) 0 220px, transparent 221px),
-    var(--bg);
+  background: var(--sky);
 }
-.auth__card {
-  width: 100%;
-  max-width: 420px;
-  padding: 32px 24px;
-  display: grid;
-  gap: 20px;
-}
-.auth__logo { display: block; width: 190px; height: auto; margin: 0 auto 4px; }
+.auth__wrap { width: 100%; max-width: 420px; display: grid; gap: 24px; }
+.auth__card { padding: 28px 24px; display: grid; gap: 20px; }
+.auth__logo { display: block; width: min(260px, 75%); height: auto; margin: 0 auto; }
 .auth__title { font-size: 1.8rem; text-align: center; }
 .auth__lead { margin: -8px 0 0; text-align: center; color: var(--ink-2); }
 .auth__form { display: grid; gap: 16px; }

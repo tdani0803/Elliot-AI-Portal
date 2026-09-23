@@ -5,8 +5,8 @@
 
 :root {
   /* Colour */
-  --sky: #7fc4e0;          /* primary brand */
-  --sky-deep: #3d9cc4;     /* hover / focus on sky */
+  --sky: #95d3ee;          /* primary brand */
+  --sky-deep: #5bb8e0;     /* hover / focus on sky */
   --sky-soft: #e3f3fa;     /* tinted backgrounds */
   --ink: #111418;          /* text, outlines, shadows */
   --ink-2: #3b4148;        /* secondary text */
@@ -24,7 +24,7 @@
   --neutral-soft: #eceff2;
 
   /* Type */
-  --font-display: 'Baloo 2', 'Arial Rounded MT Bold', system-ui, sans-serif;
+  --font-display: 'Poppins', 'Arial Black', system-ui, sans-serif;
   --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   /* Shape — thick outlines + hard offset shadow, echoing the logo */
