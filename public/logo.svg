@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 80" role="img" aria-label="ElliotAI">
+  <!-- Placeholder wordmark. Replace this file with the real ElliotAI logo (keep the name logo.svg). -->
+  <g stroke="#111418" stroke-width="5" stroke-linejoin="round">
+    <path d="M10 14h52a10 10 0 0 1 10 10v26a10 10 0 0 1-10 10H34l-14 12 2-12H10A10 10 0 0 1 0 50V24a10 10 0 0 1 10-10z" transform="translate(4 0)" fill="#7fc4e0"/>
+  </g>
+  <circle cx="26" cy="37" r="5" fill="#111418"/>
+  <circle cx="50" cy="37" r="5" fill="#111418"/>
+  <text x="86" y="56" font-family="'Baloo 2','Arial Rounded MT Bold','Arial Black',sans-serif" font-weight="800" font-size="46"
+        fill="#ffffff" stroke="#111418" stroke-width="7" paint-order="stroke" letter-spacing="-1">Elliot<tspan fill="#7fc4e0">AI</tspan></text>
+</svg>

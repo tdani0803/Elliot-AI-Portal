@@ -1,0 +1,22 @@
+{
+  "name": "elliotai-client-portal",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test tests/*.test.mjs",
+    "create-client": "node scripts/create-client.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.0"
+  },
+  "devDependencies": {
+    "vite": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=20.19"
+  }
+}

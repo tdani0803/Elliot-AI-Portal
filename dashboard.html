@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#7fc4e0" />
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" />
+  <title>Dashboard · ElliotAI</title>
+</head>
+<body>
+  <div class="demo-banner" id="demo-banner" hidden>Demo mode — showing sample data</div>
+  <header class="topbar">
+    <img class="topbar__logo" src="/logo.svg" alt="ElliotAI" width="142" height="38" />
+    <button class="btn btn--ghost btn--small" id="logout" type="button">Log out</button>
+  </header>
+
+  <main class="page" id="page" aria-busy="true">
+    <section class="hello">
+      <h1 class="hello__business" id="business">&nbsp;</h1>
+      <p class="hello__sub">Here's what your AI receptionist handled for you.</p>
+    </section>
+
+    <div class="range" role="group" aria-label="Date range" id="range"></div>
+
+    <section class="card hero" aria-labelledby="hero-label">
+      <span class="hero__label" id="hero-label">Estimated value captured</span>
+      <span class="hero__value" id="value">–</span>
+      <p class="hero__saved" id="saved"></p>
+      <p class="hero__fineprint" id="fineprint"></p>
+    </section>
+
+    <section class="stats" aria-label="Call numbers">
+      <div class="card stat">
+        <span class="stat__label">Calls handled</span>
+        <span class="stat__value" id="stat-calls">–</span>
+        <span class="stat__hint">Answered by Elliot</span>
+      </div>
+      <div class="card stat">
+        <span class="stat__label">Leads captured</span>
+        <span class="stat__value" id="stat-leads">–</span>
+        <span class="stat__hint">Real jobs, not spam</span>
+      </div>
+      <div class="card stat">
+        <span class="stat__label">Call minutes</span>
+        <span class="stat__value" id="stat-minutes">–</span>
+        <span class="stat__hint">Time off your phone</span>
+      </div>
+      <div class="card stat">
+        <span class="stat__label">Avg call length</span>
+        <span class="stat__value" id="stat-avg">–</span>
+        <span class="stat__hint">Per call</span>
+      </div>
+    </section>
+
+    <section class="card urgency" aria-labelledby="urgency-title">
+      <h2 class="section-title" id="urgency-title">How urgent were they?</h2>
+      <div class="urgency__bar" id="urgency-bar" role="img"></div>
+      <ul class="urgency__legend" id="urgency-legend"></ul>
+    </section>
+
+    <section class="calls" aria-labelledby="calls-title">
+      <div class="calls__head">
+        <h2 class="section-title" id="calls-title">Recent calls</h2>
+        <span class="calls__live" id="live" hidden>Live</span>
+      </div>
+      <ul class="call-list" id="call-list"></ul>
+      <button class="btn btn--ghost btn--block" id="more" type="button" hidden>Show more calls</button>
+    </section>
+
+    <p class="footer-note">Need something changed? Just call or text us — we'll sort it.</p>
+  </main>
+  <script type="module" src="/src/pages/dashboard.js"></script>
+</body>
+</html>

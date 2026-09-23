@@ -1,0 +1,121 @@
+/*
+ * ElliotAI brand tokens — shared by the portal and the marketing website.
+ * Copy this file, and the Google Fonts <link> from index.html, into the website so both feel like one product.
+ */
+
+:root {
+  /* Colour */
+  --sky: #7fc4e0;          /* primary brand */
+  --sky-deep: #3d9cc4;     /* hover / focus on sky */
+  --sky-soft: #e3f3fa;     /* tinted backgrounds */
+  --ink: #111418;          /* text, outlines, shadows */
+  --ink-2: #3b4148;        /* secondary text */
+  --ink-3: #6b7280;        /* muted text */
+  --paper: #ffffff;        /* cards */
+  --bg: #f3f7f9;           /* page */
+
+  /* Urgency (always shown with a text label, never colour alone) */
+  --urgent: #e0463a;
+  --urgent-soft: #fde4e1;
+  --somewhat: #f2a41c;
+  --somewhat-soft: #fff1d6;
+  --calm: #2f9e6e;
+  --calm-soft: #dcf3e8;
+  --neutral-soft: #eceff2;
+
+  /* Type */
+  --font-display: 'Baloo 2', 'Arial Rounded MT Bold', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Shape — thick outlines + hard offset shadow, echoing the logo */
+  --border: 3px solid var(--ink);
+  --radius: 18px;
+  --radius-sm: 12px;
+  --shadow: 5px 5px 0 var(--ink);
+  --shadow-sm: 3px 3px 0 var(--ink);
+}
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 0;
+}
+
+a { color: var(--ink); font-weight: 600; }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 24px;
+  border: var(--border);
+  border-radius: 999px;
+  background: var(--sky);
+  color: var(--ink);
+  font: 800 1.15rem/1 var(--font-display);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.15s ease;
+}
+.btn:hover { background: var(--sky-deep); }
+.btn:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ink); }
+.btn:disabled { opacity: 0.6; cursor: progress; }
+.btn--block { width: 100%; }
+.btn--ghost { background: var(--paper); }
+.btn--ghost:hover { background: var(--sky-soft); }
+.btn--small { min-height: 40px; padding: 0 16px; font-size: 1rem; }
+
+/* Cards */
+.card {
+  background: var(--paper);
+  border: var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+/* Forms */
+.field { display: grid; gap: 6px; }
+.field label { font-weight: 700; font-size: 0.95rem; }
+.field input {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 16px;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font: 500 1.05rem var(--font-body);
+}
+.field input:focus { outline: none; box-shadow: 0 0 0 4px var(--sky); }
+
+:focus-visible { outline: 3px solid var(--sky-deep); outline-offset: 3px; }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
