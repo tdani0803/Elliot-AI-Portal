@@ -6,6 +6,7 @@
 
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { parseWebhook } from '../lib/parse-call.mjs';
+import { normaliseSupabaseUrl } from '../../src/lib/supabase-url.js';
 
 const json = (status, body) => Response.json(body, { status });
 
@@ -23,8 +24,8 @@ function isAuthorised(req, expected) {
 }
 
 async function supabase(path, init = {}) {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const res = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY.trim();
+  const res = await fetch(`${normaliseSupabaseUrl(process.env.SUPABASE_URL)}/rest/v1/${path}`, {
     ...init,
     headers: {
       apikey: key,

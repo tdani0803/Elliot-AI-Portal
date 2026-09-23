@@ -1,9 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
+import { normaliseSupabaseUrl } from './supabase-url.js';
 
 export const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
-const url = import.meta.env.VITE_SUPABASE_URL;
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const url = normaliseSupabaseUrl(import.meta.env.VITE_SUPABASE_URL);
+const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
 
 if (!DEMO_MODE && (!url || !anonKey)) {
   // Show the problem on screen instead of leaving buttons that silently do nothing.
