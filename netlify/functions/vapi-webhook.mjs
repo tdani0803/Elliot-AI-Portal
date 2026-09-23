@@ -19,7 +19,9 @@ function sameSecret(given, expected) {
 function isAuthorised(req, expected) {
   const header = req.headers.get('x-vapi-secret') ?? '';
   const bearer = (req.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '');
-  return [header, bearer].some((given) => given && sameSecret(given, expected));
+  // Also accept ?secret=… on the URL, for setups where Vapi's secret field is hard to find.
+  const query = new URL(req.url).searchParams.get('secret') ?? '';
+  return [header, bearer, query].some((given) => given && sameSecret(given, expected));
 }
 
 async function supabase(path, init = {}) {
