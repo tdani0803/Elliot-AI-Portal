@@ -5,6 +5,14 @@ import { createDataSource } from '../lib/data.js';
 import { RANGES, rangeStart } from '../lib/metrics.js';
 import { callbackList } from '../lib/insights.js';
 import { escapeHtml } from '../lib/format.js';
+import {
+  canPromptInstall,
+  enableNotifications,
+  notificationStatus,
+  promptInstall,
+  registerServiceWorker,
+  sendTestNotification,
+} from '../lib/push.js';
 import * as home from './tabs/home.js';
 import * as leads from './tabs/leads.js';
 import * as jobs from './tabs/jobs.js';
@@ -36,6 +44,9 @@ const state = {
   calls: [],
   bookings: [],
   pro: true,
+  alerts: false,
+  notify: null, // notification status for this phone: install-ios | off | denied | unsupported | on
+  openedAlerts: new Set(),
   range: saved('range', 'week', RANGES.map((r) => r.id)),
   leadFilter: 'new',
   leadSearch: '',
@@ -51,10 +62,28 @@ const data = await createDataSource();
 // ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
-const currentTab = () => {
-  const tab = location.hash.slice(1);
-  return TABS[tab] ? tab : 'home';
+// "#leads/<call id>" opens the Leads tab on that lead (used by notification taps).
+const route = () => {
+  const [tab, id] = location.hash.slice(1).split('/');
+  return { tab: TABS[tab] ? tab : 'home', id: id ? decodeURIComponent(id) : null };
 };
+const currentTab = () => route().tab;
+
+// Seeing a lead counts as "opened", so no backup text is sent for it.
+function markOpened(id) {
+  if (!id || state.openedAlerts.has(id)) return;
+  state.openedAlerts.add(id);
+  data.markAlertOpened(id).catch(() => state.openedAlerts.delete(id));
+}
+
+function openDeepLink() {
+  const { tab, id } = route();
+  if (tab !== 'leads' || !id) return;
+  state.open.add(id);
+  state.sticky.add(id);
+  markOpened(id);
+  requestAnimationFrame(() => document.querySelector(`details[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'start' }));
+}
 
 function render() {
   const tab = currentTab();
@@ -63,7 +92,7 @@ function render() {
     if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   });
-  const waiting = state.pro ? callbackList(state.calls, now).length : 0;
+  const waiting = state.pro ? callbackList(state.calls, now, state.client).length : 0;
   $('leads-badge').textContent = waiting > 99 ? '99+' : String(waiting);
   $('leads-badge').hidden = waiting === 0;
 
@@ -82,6 +111,7 @@ function render() {
     input?.focus();
     input?.setSelectionRange(input.value.length, input.value.length);
   }
+  view.querySelectorAll('[data-install]').forEach((el) => (el.hidden = !canPromptInstall()));
   view.setAttribute('aria-busy', 'false');
 }
 
@@ -306,7 +336,53 @@ const actions = {
   print() {
     window.print();
   },
+  async 'enable-push'(el) {
+    el.disabled = true;
+    el.textContent = 'Turning on…';
+    try {
+      const result = await enableNotifications(state.client.id);
+      state.notify = await notificationStatus();
+      if (result === 'granted') toast("Notifications on. We'll buzz you for every new lead.");
+      else toast('Notifications were not allowed.', true);
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Couldn't turn on notifications. Try again.", true);
+    }
+    render();
+  },
+  async 'install-app'() {
+    if (await promptInstall()) toast('Added to your home screen');
+    render();
+  },
+  async 'test-push'(el) {
+    el.disabled = true;
+    try {
+      const { delivered } = await sendTestNotification();
+      toast(delivered ? 'Test sent. Check your notifications.' : "Couldn't reach this phone. Try turning notifications off and on.", !delivered);
+    } catch {
+      toast("Couldn't send a test. Try again.", true);
+    }
+    el.disabled = false;
+  },
+  'calendar-help'() {
+    const https = `${location.origin}/api/calendar/${state.client.calendar_token}.ics`;
+    $('calendar-webcal').href = https.replace(/^https?:/, 'webcal:');
+    $('calendar-copy').dataset.link = https;
+    $('calendar-dialog').showModal();
+  },
 };
+
+$('calendar-copy').addEventListener('click', async (event) => {
+  try {
+    await navigator.clipboard.writeText(event.currentTarget.dataset.link);
+    toast('Calendar link copied');
+  } catch {
+    prompt('Copy this link:', event.currentTarget.dataset.link);
+  }
+});
+$('calendar-dialog').addEventListener('click', (event) => {
+  if (event.target.closest('[data-close]') || event.target === $('calendar-dialog')) $('calendar-dialog').close();
+});
 
 $('view').addEventListener('click', (event) => {
   const el = event.target.closest('[data-action]');
@@ -353,16 +429,19 @@ $('view').addEventListener(
   (event) => {
     const id = event.target.dataset?.id;
     if (!id) return;
-    if (event.target.open) state.open.add(id);
-    else state.open.delete(id);
+    if (event.target.open) {
+      state.open.add(id);
+      if (currentTab() === 'leads') markOpened(id);
+    } else state.open.delete(id);
   },
   true,
 );
 
 window.addEventListener('hashchange', () => {
   state.sticky.clear();
-  render();
   window.scrollTo(0, 0);
+  openDeepLink();
+  render();
 });
 
 // ---------------------------------------------------------------------------
@@ -374,6 +453,7 @@ async function loadAll() {
   state.bookings = bookings;
   state.members = members;
   state.pro = data.pro;
+  state.alerts = data.alerts;
 }
 
 let reloadTimer;
@@ -417,11 +497,20 @@ async function start() {
   }
   $('upgrade-banner').hidden = state.pro;
   $('tabbar').hidden = false;
+  if (state.alerts) {
+    registerServiceWorker();
+    state.notify = await notificationStatus().catch(() => 'unsupported');
+  }
+  openDeepLink();
   render();
 
   data.subscribe(scheduleReload);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') scheduleReload();
+  window.addEventListener('elliot:installable', render);
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible') return;
+    // They may have just changed notification settings on the phone.
+    if (state.alerts) state.notify = await notificationStatus().catch(() => state.notify);
+    scheduleReload();
   });
 }
 

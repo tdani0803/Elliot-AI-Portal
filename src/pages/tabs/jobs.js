@@ -73,6 +73,11 @@ export function render({ state, now }) {
       </div>
       <button class="btn" type="button" data-action="new-booking">${ICONS.plus}Book a job</button>
     </section>
+    ${
+      state.client.calendar_token
+        ? `<button class="btn btn--ghost btn--block" type="button" data-action="calendar-help">Show these jobs in my phone's calendar</button>`
+        : ''
+    }
     ${upcoming.length ? grouped(upcoming, now) : emptyCard('No jobs booked yet', 'Tap <strong>Book a job</strong>, or open a lead and tap <strong>Book job</strong>.')}
     ${
       past.length

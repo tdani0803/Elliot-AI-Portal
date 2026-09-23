@@ -2,6 +2,7 @@
 import { formatMinutes, formatNumber, formatPercent } from '../../lib/format.js';
 import { RANGES } from '../../lib/metrics.js';
 import { callbackList, summariseRange } from '../../lib/insights.js';
+import { promiseMinutes, promisePhrase } from '../../lib/promise.js';
 import { ICONS, esc, money, rangeToggle, shortTime, telHref, timeAgo, urgencyPill } from './bits.js';
 
 function moneyCard(s, rangeLabel) {
@@ -39,7 +40,13 @@ function moneyCard(s, rangeLabel) {
   </section>`;
 }
 
-function callbackCard(list) {
+function dueText(c, client, now) {
+  if (c.overdue) return `<strong class="overdue">Overdue</strong> · we told them ${promisePhrase(promiseMinutes(c.urgency, client))}`;
+  const sameDay = c.dueAt.toDateString() === now.toDateString();
+  return `Call back by ${shortTime(c.dueAt)}${sameDay ? '' : ` ${c.dueAt.toLocaleDateString('en-AU', { weekday: 'short' })}`}`;
+}
+
+function callbackCard(list, client, now) {
   if (list.length === 0) {
     return `<section class="card todo todo--done">
       <h2 class="section-title">All caught up ✅</h2>
@@ -53,7 +60,7 @@ function callbackCard(list) {
         <div class="todo__text">
           <span class="todo__name">${esc(c.caller_name) || 'Unknown caller'} ${urgencyPill(c.urgency)}</span>
           <span class="todo__issue">${esc(c.issue) || 'No reason given'}</span>
-          <span class="todo__meta">${c.overdue ? '⏰ Waiting ' : 'Called '}${timeAgo(c.call_started_at)}</span>
+          <span class="todo__meta">Called ${timeAgo(c.call_started_at)} · ${dueText(c, client, now)}</span>
         </div>
         <div class="todo__actions">
           ${c.callback_number ? `<a class="btn btn--small" href="${telHref(c.callback_number)}">${ICONS.phone}Call</a>` : ''}
@@ -95,19 +102,50 @@ function nextJobCard(bookings, now) {
   </section>`;
 }
 
+// Getting notifications set up — shown until this phone is receiving them.
+function alertsCard(status) {
+  if (!status || status === 'on') return '';
+  const title = '<h2 class="section-title">Get a buzz for every new lead</h2>';
+  const why = "<p>We'll notify you the moment Elliot takes a call: who it is, what they need, and how urgent it is.</p>";
+  const bodies = {
+    'install-ios': `${why}
+      <p><strong>On iPhone, first add ElliotAI to your home screen:</strong></p>
+      <ol class="steps">
+        <li>In <strong>Safari</strong>, tap the <strong>Share</strong> button (the square with an arrow).</li>
+        <li>Scroll down and tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
+        <li>Open <strong>ElliotAI</strong> from your home screen and log in.</li>
+        <li>Tap <strong>Turn on notifications</strong> on this card.</li>
+      </ol>`,
+    off: `${why}
+      <div class="call__actions">
+        <button class="btn" type="button" data-action="enable-push">Turn on notifications</button>
+        <button class="btn btn--ghost" type="button" data-action="install-app" data-install hidden>Add to home screen</button>
+      </div>`,
+    denied: `<p>Notifications are <strong>blocked</strong> on this phone, so you won't hear about new leads.</p>
+      <ol class="steps">
+        <li>Open your phone's <strong>Settings</strong>.</li>
+        <li>Go to <strong>Notifications</strong>, then <strong>ElliotAI</strong> (or your web browser).</li>
+        <li>Turn <strong>Allow notifications</strong> on, then come back and refresh this page.</li>
+      </ol>`,
+    unsupported: `<p>This browser can't show notifications. On <strong>Android</strong>, open this page in <strong>Chrome</strong>. On <strong>iPhone</strong>, open it in <strong>Safari</strong> and add it to your home screen.</p>`,
+  };
+  return `<section class="card setup" aria-label="Notifications">${title}${bodies[status] ?? ''}</section>`;
+}
+
 export function render({ state, since, now }) {
   const rangeLabel = RANGES.find((r) => r.id === state.range).label.toLowerCase();
   const s = summariseRange({ calls: state.calls, client: state.client, since, range: state.range, now });
-  const list = callbackList(state.calls, now);
+  const list = callbackList(state.calls, now, state.client);
 
   return `
     <section class="hello">
       <h1 class="hello__business">${esc(state.client.business_name)}</h1>
       <p class="hello__sub">Here's how Elliot is going for you.</p>
     </section>
+    ${state.alerts ? alertsCard(state.notify) : ''}
     ${rangeToggle(state.range)}
     ${moneyCard(s, rangeLabel)}
-    ${state.pro ? callbackCard(list) : ''}
+    ${state.pro ? callbackCard(list, state.client, now) : ''}
     <section class="stats" aria-label="Call numbers">
       <div class="card stat">
         <span class="stat__label">Calls answered</span>
@@ -131,5 +169,6 @@ export function render({ state, since, now }) {
       </div>
     </section>
     ${state.pro ? nextJobCard(state.bookings, now) : ''}
+    ${state.alerts && state.notify === 'on' ? `<p class="footer-note">Notifications are on for this phone · <button class="link-button" type="button" data-action="test-push">Send a test</button></p>` : ''}
     <p class="footer-note">Need something changed? Just call or text us — we'll sort it.</p>`;
 }

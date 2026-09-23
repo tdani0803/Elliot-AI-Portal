@@ -1,6 +1,7 @@
 // Pure dashboard analytics over a list of call rows. No DOM, no network.
 import { LEAD_URGENCIES, estimatedValue } from './metrics.js';
 import { DEFAULT_HOURS, DEFAULT_TZ, isAfterHours, zonedParts } from './time.js';
+import { dueAt } from './promise.js';
 
 export const STATUSES = [
   { id: 'new', label: 'Needs a call back', short: 'New' },
@@ -11,8 +12,6 @@ export const STATUSES = [
 ];
 export const OPEN_STATUSES = ['new', 'called_back', 'quoted'];
 const URGENCY_RANK = { urgent: 0, somewhat_urgent: 1, non_urgent: 2 };
-// How long before an un-called lead counts as overdue.
-const OVERDUE_HOURS = { urgent: 2, somewhat_urgent: 12, non_urgent: 24 };
 
 export const isLead = (call) => LEAD_URGENCIES.includes(call.urgency);
 export const statusOf = (call) => call.lead_status ?? 'new';
@@ -87,12 +86,14 @@ export function summariseRange({ calls, client, since, range, now = new Date() }
 }
 
 // Leads nobody has called back yet, most urgent first, then oldest first.
-export function callbackList(calls, now = new Date()) {
+// A lead is overdue once the call-back time Elliot promised the caller has passed.
+export function callbackList(calls, now = new Date(), client = {}) {
   return calls
     .filter((c) => isLead(c) && statusOf(c) === 'new')
     .map((c) => {
       const ageHours = (now - new Date(c.call_started_at)) / 3600000;
-      return { ...c, ageHours, overdue: ageHours >= (OVERDUE_HOURS[c.urgency] ?? 24) };
+      const due = dueAt(c, client);
+      return { ...c, ageHours, dueAt: due, overdue: now >= due };
     })
     .sort((a, b) => URGENCY_RANK[a.urgency] - URGENCY_RANK[b.urgency] || b.ageHours - a.ageHours);
 }

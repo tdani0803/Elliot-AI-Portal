@@ -260,13 +260,84 @@ This lets Elliot check your calendar and book the job while the customer is stil
 
 ---
 
+## Part 10 — Phone app and new-lead alerts · 15 min
+
+This turns ElliotAI into an app on the tradie's phone. It buzzes them for every new lead, so they don't need a text for each call any more.
+
+### Step A: Run the second update in Supabase
+
+Same as Part 9 Step A, but with this file: `supabase/migrations/20260925000000_alerts.sql`. It's safe to run more than once.
+
+### Step B: Fill in 3 boxes in the client's row
+
+Go to **Supabase → Table Editor → clients**:
+
+| Box | What to put |
+|---|---|
+| **callback_urgent_minutes** | How fast Elliot promises urgent callers a call back. `60` = within 1 hour. |
+| **callback_standard_minutes** | The same for everyone else. `240` = within 4 hours. |
+| **alert_phone** | The tradie's mobile, like `0412 345 678`. Used only for backup texts. |
+
+> ⚠️ **Elliot must say the same thing.** In Vapi, make sure the assistant's prompt tells callers the same times, for example *"If it's urgent, tell them someone will call back within 1 hour. Otherwise, within 4 hours."* The notification repeats this promise, and the portal marks the lead **Overdue** once the time passes.
+
+### Step C: Stop the old text messages
+
+Your **Send Text** tool in Vapi can now send the lead to the portal instead of texting.
+
+1. In **Vapi**, go to **Tools** and open your **Send Text** tool.
+2. Change its **Server URL** to your `WEBSITE` with `/api/vapi-webhook` on the end. This is the same link as in Part 7.
+3. Put your `VAPI SECRET` in its **Secret** box.
+4. Click **Save**.
+
+The tool keeps collecting the caller's name, number, address, issue and urgency. Now they go straight into the portal, and the tradie gets a phone notification instead of a text.
+
+> **No Server URL box on your Send Text tool?** Then it's Vapi's built-in SMS tool. Create a new **Function** tool called `send_text` instead. The settings to paste are in [docs/TECHNICAL.md](docs/TECHNICAL.md#send-text-tool-replacement). Add it to the assistant, then remove the old SMS tool.
+
+### Step D: Set up the phone (do this with each client, it takes 1 minute)
+
+**iPhone**
+1. Open your `WEBSITE` in **Safari**. It must be Safari.
+2. Tap the **Share** button (the square with an arrow), then **Add to Home Screen**, then **Add**.
+3. Open **ElliotAI** from the home screen and log in.
+4. Tap **Turn on notifications**, then **Allow**.
+5. Scroll to the bottom of Home and tap **Send a test**. A notification should pop up. ✅
+
+**Android**
+1. Open your `WEBSITE` in **Chrome** and log in.
+2. Tap **Turn on notifications**, then **Allow**.
+3. Tap **Add to home screen** if it shows. If not, use Chrome's **⋮** menu, then **Add to Home screen**.
+4. Tap **Send a test** at the bottom of Home. ✅
+
+### Step E (optional but recommended): Backup texts
+
+A backup text is only sent when:
+- the tradie hasn't turned notifications on yet, **or**
+- an **urgent** lead's notification hasn't been opened within **10 minutes**.
+
+To switch this on:
+1. Make an account at [twilio.com](https://www.twilio.com). Texts cost about 5–10c each.
+2. In Twilio, either buy an Australian number or set up a sender name like `ElliotAI`. Twilio walks you through it.
+3. In **Netlify**, go to **Site configuration → Environment variables** and add these 3 settings:
+
+   | Name | Value |
+   |---|---|
+   | `TWILIO_ACCOUNT_SID` | From your Twilio dashboard (starts with `AC`) |
+   | `TWILIO_AUTH_TOKEN` | From your Twilio dashboard |
+   | `TWILIO_FROM_NUMBER` | Your Twilio number, like `+61412345678`, or your sender name |
+
+4. Go to **Deploys**, then **Trigger deploy**.
+
+Until this is set up, everything else still works. There's just no backup text.
+
+---
+
 ## What each tab does
 
 | Tab | What it's for |
 |---|---|
 | **Home** | Money won, who to call back, and the key numbers at a glance. |
 | **Leads** | Every call. Tap one to hear the recording, read the summary, call or text them, and move it along: **New → Called → Quoted → Won / Lost**. When you tap **Won**, type what the job was worth. That becomes real money on the Home screen. |
-| **Jobs** | Your bookings, day by day. Tap **Book a job**, or book straight from a lead. Jobs Elliot booked say **Booked by Elliot**. |
+| **Jobs** | Your bookings, day by day. Tap **Book a job**, or book straight from a lead. Jobs Elliot booked say **Booked by Elliot**. Tap **Show these jobs in my phone's calendar** to see them in Apple, Google or Outlook calendar. |
 | **Customers** | Everyone who's called, with their history. Repeat callers are marked. |
 | **Report** | The monthly summary: money, call-to-job funnel, what people call about, suburbs and busiest times. Tap **Save as PDF** to send it to someone. |
 
@@ -280,6 +351,7 @@ This lets Elliot check your calendar and book the job while the customer is stil
 | "That email and password don't match" | Check for typos. Or delete the user in **Supabase → Authentication → Users** and do Part 5 again. |
 | "ElliotAI just needs to link it to your business" | Do Part 6. Make sure you picked the right email in **user_id**. |
 | The buttons do nothing, or a pink "Setup problem" box appears | In Netlify, check the 5 settings from Step 6, then **Deploys → Trigger deploy → Deploy site**. |
+| No notification on the phone | On iPhone, it must be opened from the **home screen** icon, not Safari. Check the phone's **Settings → Notifications → ElliotAI** is on, and **Do Not Disturb / Focus** is off. Then tap **Send a test** on Home. |
 | A call doesn't show up | 1. Check the Vapi **Server URL** ends in `/api/vapi-webhook`. 2. Check the Vapi secret matches `VAPI_WEBHOOK_SECRET` in Netlify **exactly**. 3. Check the **vapi_assistant_id** in Supabase matches the assistant's ID in Vapi **exactly**. |
 | I want to see what went wrong | In Netlify, go to **Logs → Functions → vapi-webhook**. Errors show up there. |
 

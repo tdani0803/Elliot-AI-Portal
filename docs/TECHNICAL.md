@@ -180,3 +180,67 @@ Add this to the assistant's prompt so it uses the right dates:
 Both tools only offer times inside `business_hours` that don't overlap a booked job. Replies are short sentences for Elliot to read out.
 
 **Job type (optional):** add a `job_type` field, such as "Roof leak" or "Gutters", to the Send Text tool arguments or the analysis structured data. The Report's "What people called about" then groups neatly. Without it, the report groups by the `issue` text.
+
+
+## Phone app, lead alerts and calendar feed (migration `20260925000000_alerts.sql`)
+
+**Installable app (PWA):** `public/manifest.webmanifest`, the icons and `public/sw.js`. The service worker only handles push and notification clicks. There's no offline caching, so deploys show up immediately.
+
+**Lead alerts:** the flow runs like this.
+1. The webhook saves the call from the end-of-call report, or mid-call from the Send Text tool (`save_lead`).
+2. It then calls `alertIfNewLead()`. That atomically claims the call with `PATCH calls?notified_at=is.null&urgency=in.(…)`, so each lead alerts **once** even though two messages arrive per call.
+3. It pushes to every `push_subscriptions` row for the client. Dead subscriptions (404/410) are deleted.
+4. If no phone received it, it sends a Twilio SMS straight away, if one is configured.
+
+**Backup SMS:** `netlify/functions/alert-backup.mjs` runs every 5 minutes. It texts about **urgent** leads that meet all of these:
+- notified more than 10 minutes ago and less than 6 hours ago,
+- still `new`,
+- not opened (`alert_opened_at` is null),
+- no SMS sent yet.
+
+The claim-by-PATCH on `sms_sent_at` stops the same lead being texted twice. Opening a lead in the portal, including by tapping the notification, sets `alert_opened_at`.
+
+**Notification text:**
+- Title: `URGENT – New lead: Sarah Mitchell`, or `New lead (not urgent): …` / `(somewhat urgent)`.
+- Body: "Elliot just answered a call. Roof leak over kitchen, Newtown. We told them you'd call back within 1 hour."
+
+Only the suburb goes on the lock screen, never the full address. Push notifications are plain text, so the urgency goes first in capitals.
+
+**VAPID keys:** these are generated on first use and stored in `app_secrets`, a table only the service role can read. Set `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` in Netlify to override. `VAPID_SUBJECT` defaults to `mailto:alerts@elliotai.com.au`.
+
+**Calendar feed:** `GET /api/calendar/<clients.calendar_token>.ics` serves the last 30 days and all future bookings as iCalendar. It's one-way: portal to the phone calendar. To revoke a link, set a new `calendar_token` (`update clients set calendar_token = gen_random_uuid() where id = …`).
+
+**Endpoints:**
+- `/api/push-config`: public VAPID key.
+- `/api/push-test`: push to the caller's own phones. Needs a Supabase access token.
+- `/api/calendar/:token.ics`
+- `/api/vapi-webhook`
+
+## Send Text tool replacement
+
+If the existing Send Text is Vapi's built-in SMS tool, replace it with a **Function** tool:
+- **Name:** `send_text`
+- **Description:** *"Send the caller's details to the business once you have them."*
+- **Server URL:** `https://<your-site>/api/vapi-webhook`
+- **Server secret:** your `VAPI_WEBHOOK_SECRET`
+
+Parameters:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "name": { "type": "string", "description": "Caller's name" },
+    "callback_number": { "type": "string", "description": "Best number to call them back on" },
+    "address": { "type": "string", "description": "Job address including suburb" },
+    "issue": { "type": "string", "description": "Short summary of the problem, e.g. Roof leak over kitchen" },
+    "details": { "type": "string", "description": "Any extra details they gave" },
+    "urgency": { "type": "string", "enum": ["Urgent", "Somewhat Urgent", "Non-Urgent", "Irrelevant"] },
+    "job_type": { "type": "string", "description": "Category, e.g. Roof leak, Gutters, Tiling" },
+    "job_value": { "type": "string" }
+  },
+  "required": ["name", "issue", "urgency"]
+}
+```
+
+The webhook saves these straight onto the call, sends the new-lead alert, and replies "Details sent."

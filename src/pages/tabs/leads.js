@@ -1,7 +1,8 @@
 // Leads: every call as a lead card with a simple status pipeline.
 import { formatDuration, formatWhen } from '../../lib/format.js';
 import { STATUSES, isLead, statusOf, suburbOf } from '../../lib/insights.js';
-import { ICONS, esc, firstName, mapsHref, money, smsHref, statusPill, telHref, urgencyPill } from './bits.js';
+import { dueAt } from '../../lib/promise.js';
+import { ICONS, esc, firstName, mapsHref, money, shortTime, smsHref, statusPill, telHref, urgencyPill } from './bits.js';
 
 export const FILTERS = [
   { id: 'new', label: 'Call back', test: (c) => isLead(c) && statusOf(c) === 'new' },
@@ -29,6 +30,11 @@ function statusButtons(call) {
     (s) =>
       `<button type="button" class="status-btn status-btn--${s.id}" data-action="set-status" data-id="${call.id}" data-status="${s.id}" aria-pressed="${s.id === current}">${s.short}</button>`,
   ).join('')}</div>`;
+}
+
+function dueBadge(call, client) {
+  const due = dueAt(call, client);
+  return new Date() >= due ? '<strong class="overdue">Overdue</strong>' : `<span>Call back by ${shortTime(due)}</span>`;
 }
 
 function leadCard(call, { members, client, pro }) {
@@ -81,6 +87,7 @@ function leadCard(call, { members, client, pro }) {
           <span>${formatWhen(call.call_started_at)}</span>
           <span>${formatDuration(call.duration_seconds ?? 0)} call</span>
           ${pro && lead ? statusPill(call) : ''}
+          ${pro && lead && statusOf(call) === 'new' ? dueBadge(call, client) : ''}
           ${call.won_value && statusOf(call) === 'won' ? `<span class="won-amount">${money(call.won_value)}</span>` : ''}
           ${call.assigned_to ? `<span>👷 ${esc(call.assigned_to)}</span>` : ''}
         </span>

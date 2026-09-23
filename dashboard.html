@@ -6,7 +6,12 @@
   <meta name="theme-color" content="#95d3ee" />
   <meta name="robots" content="noindex" />
   <link rel="icon" href="/favicon.png" type="image/png" />
-  <link rel="apple-touch-icon" href="/favicon.png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="ElliotAI" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,700;0,800;1,800&family=Inter:wght@400;500;600;700&display=swap" />
@@ -79,6 +84,35 @@
         <button class="link-button link-button--danger" type="button" id="booking-delete">Delete</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog class="sheet" id="calendar-dialog" aria-labelledby="calendar-title">
+    <div class="sheet__form">
+      <h2 class="section-title" id="calendar-title">Jobs in your phone's calendar</h2>
+      <p>Your ElliotAI jobs can show up in the calendar you already use. New jobs appear there automatically.</p>
+      <a class="btn btn--block" id="calendar-webcal" href="#">Add to iPhone calendar</a>
+      <button class="btn btn--ghost btn--block" type="button" id="calendar-copy">Copy calendar link</button>
+      <details class="help">
+        <summary>Using Google Calendar?</summary>
+        <ol class="steps">
+          <li>Tap <strong>Copy calendar link</strong> above.</li>
+          <li>On a computer, open <strong>calendar.google.com</strong>.</li>
+          <li>Next to <strong>Other calendars</strong>, click <strong>+</strong>, then <strong>From URL</strong>.</li>
+          <li>Paste the link and click <strong>Add calendar</strong>. It shows on your phone too.</li>
+        </ol>
+        <p class="muted">Google can take a few hours to show new jobs. Apple and Outlook are quicker.</p>
+      </details>
+      <details class="help">
+        <summary>Using Outlook?</summary>
+        <ol class="steps">
+          <li>Tap <strong>Copy calendar link</strong> above.</li>
+          <li>In Outlook, go to <strong>Add calendar</strong>, then <strong>Subscribe from web</strong>.</li>
+          <li>Paste the link and save.</li>
+        </ol>
+      </details>
+      <p class="muted">Keep this link private: anyone with it can see your jobs. To make changes, use ElliotAI — the calendar only shows them.</p>
+      <button class="btn btn--ghost" type="button" data-close>Done</button>
+    </div>
   </dialog>
 
   <div class="toast" id="toast" role="status" hidden></div>

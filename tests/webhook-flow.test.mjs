@@ -80,6 +80,6 @@ test('Elliot books a job during a call', async () => {
 
 test('unknown tools get a harmless reply', async () => {
   fakeSupabase({ clients: () => [200, [{ id: 'k1' }]] });
-  const res = await post({ message: { type: 'tool-calls', call: { assistantId: 'asst_1' }, toolCallList: [{ id: 't', function: { name: 'send_text', arguments: {} } }] } });
+  const res = await post({ message: { type: 'tool-calls', call: { assistantId: 'asst_1' }, toolCallList: [{ id: 't', function: { name: 'lookup_price', arguments: {} } }] } });
   assert.deepEqual(await res.json(), { results: [{ toolCallId: 't', result: 'Noted.' }] });
 });

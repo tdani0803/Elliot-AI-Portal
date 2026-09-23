@@ -17,7 +17,9 @@ test('toolName accepts common spellings', () => {
   assert.equal(toolName('check_availability'), 'check_availability');
   assert.equal(toolName('checkAvailability'), 'check_availability');
   assert.equal(toolName('Book Job'), 'book_job');
-  assert.equal(toolName('send_text'), null);
+  assert.equal(toolName('send_text'), 'save_lead');
+  assert.equal(toolName('Send Text'), 'save_lead');
+  assert.equal(toolName('lookup_price'), null);
 });
 
 test('checkAvailability lists free times Elliot can read out', () => {

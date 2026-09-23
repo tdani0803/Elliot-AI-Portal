@@ -78,6 +78,9 @@ export const demoClient = {
   timezone: 'Australia/Sydney',
   business_hours: { mon: ['07:00', '17:00'], tue: ['07:00', '17:00'], wed: ['07:00', '17:00'], thu: ['07:00', '17:00'], fri: ['07:00', '17:00'], sat: null, sun: null },
   review_url: 'https://g.page/r/example/review',
+  callback_urgent_minutes: 60,
+  callback_standard_minutes: 240,
+  calendar_token: '00000000-0000-4000-8000-000000000000',
 };
 export const demoMembers = [{ display_name: 'Jake' }, { display_name: 'Mia' }];
 export const demoCalls = buildCalls();

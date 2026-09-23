@@ -509,3 +509,17 @@
   .page { padding: 0; max-width: none; }
   .card { box-shadow: none; break-inside: avoid; }
 }
+
+/* Alerts setup, overdue flags, calendar help */
+.setup { padding: 18px; display: grid; gap: 10px; background: var(--sky-soft); }
+.setup p { margin: 0; }
+.steps { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+.overdue { color: #b3261e; font-weight: 800; }
+.help { border: 2px solid var(--ink); border-radius: var(--radius-sm); padding: 10px 14px; }
+.help summary { font-weight: 700; cursor: pointer; }
+.help[open] summary { margin-bottom: 8px; }
+.help p { margin: 8px 0 0; }
+
+/* Leave room for the sticky header (and tab bar on desktop) when jumping to a lead. */
+.call { scroll-margin-top: 76px; }
+@media (min-width: 720px) { .call { scroll-margin-top: 136px; } }

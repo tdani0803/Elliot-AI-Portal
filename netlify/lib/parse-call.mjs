@@ -35,6 +35,16 @@ function clean(value) {
   return text === '' ? null : text;
 }
 
+// Caller details from a Send Text tool call's arguments -> call row fields (urgency normalised).
+export function leadFieldsFromArgs(args) {
+  const row = pickFields(args);
+  if ('urgency' in row) {
+    row.urgency = normaliseUrgency(row.urgency);
+    if (row.urgency == null) delete row.urgency;
+  }
+  return row;
+}
+
 function pickFields(source) {
   const out = {};
   if (!source || typeof source !== 'object') return out;

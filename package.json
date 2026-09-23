@@ -11,7 +11,8 @@
     "create-client": "node scripts/create-client.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.117.0"
+    "@supabase/supabase-js": "^2.117.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "vite": "^8.0.0"

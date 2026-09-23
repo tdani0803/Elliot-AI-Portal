@@ -21,6 +21,12 @@ export const TOOL_NAMES = {
   bookjob: 'book_job',
   bookappointment: 'book_job',
   createbooking: 'book_job',
+  // The existing "Send Text" tool: point it here and the lead goes to the portal instead of an SMS.
+  sendtext: 'save_lead',
+  sendsms: 'save_lead',
+  sms: 'save_lead',
+  textowner: 'save_lead',
+  savelead: 'save_lead',
 };
 
 function listTimes(slots, tz, max = 6) {

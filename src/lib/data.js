@@ -6,6 +6,7 @@ const BASE_CALL_COLUMNS =
 const PRO_CALL_COLUMNS = `${BASE_CALL_COLUMNS}, job_type, summary, recording_url, lead_status, won_value, notes, assigned_to, status_updated_at`;
 const BASE_CLIENT_COLUMNS = 'id, business_name, avg_job_value, conversion_rate';
 const PRO_CLIENT_COLUMNS = `${BASE_CLIENT_COLUMNS}, monthly_fee, timezone, business_hours, review_url`;
+const ALERT_CLIENT_COLUMNS = `${PRO_CLIENT_COLUMNS}, callback_urgent_minutes, callback_standard_minutes, calendar_token`;
 const MAX_CALLS = 3000;
 
 // "column does not exist" / "relation does not exist" => the pro_features migration isn't run yet.
@@ -13,6 +14,7 @@ const isMissingSchema = (error) => /column|relation|schema cache|does not exist/
 
 function supabaseSource() {
   let pro = true;
+  let alerts = true;
 
   async function select(table, proCols, baseCols, build) {
     if (pro) {
@@ -30,8 +32,23 @@ function supabaseSource() {
     get pro() {
       return pro;
     },
+    get alerts() {
+      return alerts && pro;
+    },
     async client() {
+      // Newest features first; fall back if the matching database update hasn't been run.
+      if (alerts) {
+        const { data, error } = await supabase.from('clients').select(ALERT_CLIENT_COLUMNS).maybeSingle();
+        if (!error) return data;
+        if (!isMissingSchema(error)) throw error;
+        alerts = false;
+      }
       return select('clients', PRO_CLIENT_COLUMNS, BASE_CLIENT_COLUMNS, (q) => q.maybeSingle());
+    },
+    // Quietly note that a lead's alert was seen, so no backup text is sent.
+    async markAlertOpened(id) {
+      if (!alerts) return;
+      await supabase.from('calls').update({ alert_opened_at: new Date().toISOString() }).eq('id', id).is('alert_opened_at', null);
     },
     async members() {
       if (!pro) return [];
@@ -103,6 +120,8 @@ async function demoSource() {
   const pause = () => new Promise((r) => setTimeout(r, 120));
   return {
     pro: true,
+    alerts: true,
+    markAlertOpened: async () => {},
     client: async () => demoClient,
     members: async () => demoMembers,
     calls: async () => calls,
