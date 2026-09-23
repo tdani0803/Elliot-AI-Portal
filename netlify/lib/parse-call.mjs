@@ -8,16 +8,20 @@
 //      { call_id, assistant_id, name, callback_number, address, issue, details,
 //        urgency, job_value, duration_seconds, started_at }
 
+// Field names are matched loosely (case, spaces and underscores ignored), so "Name",
+// "Caller Name", "customer_name" and "callerName" all work. First match in each list wins.
 const FIELD_ALIASES = {
-  caller_name: ['name', 'caller_name', 'callerName', 'customer_name', 'customerName'],
-  callback_number: ['callback_number', 'callbackNumber', 'phone', 'phone_number', 'phoneNumber'],
-  address: ['address', 'job_address', 'jobAddress'],
-  issue: ['issue', 'problem', 'reason'],
-  details: ['details', 'notes', 'description'],
-  urgency: ['urgency', 'urgency_level', 'urgencyLevel'],
-  job_value: ['job_value', 'jobValue'],
-  job_type: ['job_type', 'jobType', 'service', 'category', 'job'],
+  caller_name: ['name', 'callername', 'customername', 'fullname', 'contactname', 'clientname', 'callersname', 'firstname'],
+  callback_number: ['callbacknumber', 'phone', 'phonenumber', 'mobile', 'mobilenumber', 'contactnumber', 'bestnumber', 'number'],
+  address: ['address', 'jobaddress', 'propertyaddress', 'siteaddress', 'location', 'suburb'],
+  issue: ['issue', 'problem', 'reason', 'reasonforcall', 'jobdescription', 'serviceneeded', 'service', 'enquiry', 'inquiry', 'request'],
+  details: ['details', 'notes', 'additionaldetails', 'extradetails', 'moredetails', 'description'],
+  urgency: ['urgency', 'urgencylevel', 'priority'],
+  job_value: ['jobvalue', 'estimatedvalue', 'value'],
+  job_type: ['jobtype', 'typeofjob', 'servicetype', 'category', 'trade', 'job'],
 };
+
+const normKey = (key) => String(key).toLowerCase().replace(/[^a-z]/g, '');
 
 export function normaliseUrgency(value) {
   if (value == null) return null;
@@ -48,11 +52,41 @@ export function leadFieldsFromArgs(args) {
 function pickFields(source) {
   const out = {};
   if (!source || typeof source !== 'object') return out;
+  const byKey = new Map();
+  for (const [key, value] of Object.entries(source)) {
+    const text = typeof value === 'object' ? null : clean(value);
+    if (text != null && !byKey.has(normKey(key))) byKey.set(normKey(key), text);
+  }
+  const used = new Set();
   for (const [column, aliases] of Object.entries(FIELD_ALIASES)) {
-    const alias = aliases.find((a) => clean(source[a]) != null);
-    if (alias) out[column] = clean(source[alias]);
+    const alias = aliases.find((a) => byKey.has(a) && !used.has(a));
+    if (alias) {
+      out[column] = byKey.get(alias);
+      used.add(alias);
+    }
   }
   return out;
+}
+
+// Vapi "Structured Outputs" arrive as { <id>: { name, result } }. The result is either an
+// object of fields, or a single value when each detail is its own output (name = field).
+function fieldsFromStructuredOutputs(outputs) {
+  const merged = {};
+  for (const o of Object.values(outputs ?? {})) {
+    if (!o || typeof o !== 'object') continue;
+    const result = o.result ?? o.value;
+    if (result && typeof result === 'object') Object.assign(merged, pickFields(result));
+    else if (o.name && result != null) Object.assign(merged, pickFields({ [o.name]: result }));
+  }
+  return merged;
+}
+
+// First sentence of Vapi's call summary, as a fallback "reason for the call".
+function issueFromSummary(summary) {
+  const text = clean(summary);
+  if (!text) return null;
+  const first = text.split(/(?<=[.!?])\s/)[0];
+  return first.length > 90 ? `${first.slice(0, 87).trimEnd()}…` : first;
 }
 
 function parseArgs(args) {
@@ -91,13 +125,23 @@ function toIso(value) {
 function fromEndOfCallReport(msg) {
   const call = msg.call ?? {};
   const toolArgs = findSendTextArgs(msg.artifact?.messages ?? msg.messages);
-  // Vapi "Structured Outputs" (newer accounts) arrive as { <id>: { name, result } }.
-  const outputs = Object.values(msg.artifact?.structuredOutputs ?? {}).map((o) => o?.result ?? o);
   const fields = {
-    ...Object.assign({}, ...outputs.map(pickFields)),
+    ...fieldsFromStructuredOutputs(msg.artifact?.structuredOutputs ?? msg.analysis?.structuredOutputs),
     ...pickFields(msg.analysis?.structuredData),
     ...pickFields(toolArgs),
   };
+  const summary = clean(msg.analysis?.summary ?? msg.summary);
+  if (!fields.issue && summary) fields.issue = issueFromSummary(summary);
+
+  // Field NAMES only (never values — they're personal details), to help diagnose setup.
+  console.log(
+    'vapi end-of-call fields:',
+    JSON.stringify({
+      structuredData: Object.keys(msg.analysis?.structuredData ?? {}),
+      structuredOutputs: Object.values(msg.artifact?.structuredOutputs ?? {}).map((o) => o?.name ?? '?'),
+      matched: Object.keys(fields),
+    }),
+  );
 
   const startedAt = msg.startedAt ?? call.startedAt ?? call.createdAt;
   const endedAt = msg.endedAt ?? call.endedAt;
@@ -122,7 +166,7 @@ function fromEndOfCallReport(msg) {
         artifact.recordingUrl ?? recording.mono?.combinedUrl ?? recording.url ?? msg.recordingUrl ?? msg.stereoRecordingUrl,
       ),
       transcript: clean(artifact.transcript ?? msg.transcript),
-      summary: clean(msg.analysis?.summary ?? msg.summary),
+      summary,
     },
   };
 }

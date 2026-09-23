@@ -122,3 +122,30 @@ test('rest retries with the other header style after a 401', async () => {
   assert.deepEqual(seen, [false, true]);
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key';
 });
+
+test('caller details match loosely: capitals, spaces, one output per field, summary fallback', async () => {
+  const { parseWebhook } = await import('../netlify/lib/parse-call.mjs');
+  const a = parseWebhook({
+    message: {
+      type: 'end-of-call-report',
+      call: { id: 'c3', assistantId: 'a1' },
+      analysis: { structuredData: { Name: 'Sam Lee', 'Phone Number': '0400 000 000', 'Reason for call': 'Leaking tap', Urgency: 'Non-Urgent' } },
+    },
+  }).row;
+  assert.equal(a.caller_name, 'Sam Lee');
+  assert.equal(a.callback_number, '0400 000 000');
+  assert.equal(a.issue, 'Leaking tap');
+  assert.equal(a.urgency, 'non_urgent');
+
+  const b = parseWebhook({
+    message: {
+      type: 'end-of-call-report',
+      call: { id: 'c4', assistantId: 'a1' },
+      artifact: { structuredOutputs: { x: { name: 'Caller Name', result: 'Jo' }, y: { name: 'urgency', result: 'Urgent' } } },
+      analysis: { summary: 'The caller reported water coming through the kitchen ceiling after the storm. They want someone today.' },
+    },
+  }).row;
+  assert.equal(b.caller_name, 'Jo');
+  assert.equal(b.urgency, 'urgent');
+  assert.equal(b.issue, 'The caller reported water coming through the kitchen ceiling after the storm.');
+});
