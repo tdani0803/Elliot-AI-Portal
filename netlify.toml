@@ -1,6 +1,8 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  # Skip the build (and its credits) when only guides or tests changed.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- src public netlify supabase index.html dashboard.html signup.html forgot-password.html reset-password.html package.json package-lock.json vite.config.js netlify.toml"
 
 [functions]
   directory = "netlify/functions"
