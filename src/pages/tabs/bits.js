@@ -1,5 +1,5 @@
 // Small HTML helpers shared by the dashboard tabs.
-import { URGENCY_LABELS, escapeHtml, formatMoney } from '../../lib/format.js';
+import { URGENCY_LABELS, UNTAGGED_LABEL, escapeHtml, formatMoney } from '../../lib/format.js';
 import { RANGES } from '../../lib/metrics.js';
 import { STATUSES, statusOf } from '../../lib/insights.js';
 
@@ -22,7 +22,7 @@ export const firstName = (name) => (name ? String(name).trim().split(/\s+/)[0] :
 
 export function urgencyPill(urgency) {
   const key = urgency ?? 'unknown';
-  return `<span class="pill pill--${key}">${URGENCY_LABELS[urgency] ?? 'Not tagged'}</span>`;
+  return `<span class="pill pill--${key}">${URGENCY_LABELS[urgency] ?? UNTAGGED_LABEL}</span>`;
 }
 
 export function statusPill(call) {

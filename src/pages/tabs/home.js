@@ -1,7 +1,7 @@
 // Home: the 5-second scoreboard. Money, who to call back, the headline numbers, next job.
 import { formatMinutes, formatNumber, formatPercent } from '../../lib/format.js';
 import { RANGES } from '../../lib/metrics.js';
-import { callbackList, summariseRange } from '../../lib/insights.js';
+import { callbackList, isLead, summariseRange } from '../../lib/insights.js';
 import { promiseMinutes, promisePhrase } from '../../lib/promise.js';
 import { ICONS, esc, money, rangeToggle, shortTime, telHref, timeAgo, urgencyPill } from './bits.js';
 
@@ -37,6 +37,26 @@ function moneyCard(s, rangeLabel) {
     <span class="hero__value">${money(s.estimateAll)}</span>
     <p class="hero__saved">Money saved: <strong>~${money(s.estimateAll)}</strong> — what you'd likely have lost if these calls went unanswered.</p>
     <p class="hero__fineprint">Estimate ${assumptions}. Tip: mark jobs as <strong>Won</strong> in Leads to see real money here.</p>
+  </section>`;
+}
+
+function latestCard(calls) {
+  const latest = calls.slice(0, 5);
+  if (!latest.length) return '';
+  return `<section class="card latest" aria-labelledby="latest-title">
+    <h2 class="section-title" id="latest-title">Latest calls</h2>
+    <ul class="latest__list">${latest
+      .map(
+        (c) => `<li><button type="button" class="latest__item" data-action="open-lead" data-id="${c.id}">
+          <span class="latest__main">
+            <strong>${esc(c.caller_name) || 'Unknown caller'}</strong>
+            <span class="muted">${esc(c.issue) || 'No reason given'}</span>
+          </span>
+          <span class="latest__side">${isLead(c) ? urgencyPill(c.urgency) : '<span class="pill pill--irrelevant">Not a job</span>'}<span class="muted">${timeAgo(c.call_started_at)}</span></span>
+        </button></li>`,
+      )
+      .join('')}</ul>
+    <a class="link-more" href="#leads">All calls →</a>
   </section>`;
 }
 
@@ -146,6 +166,7 @@ export function render({ state, since, now }) {
     ${rangeToggle(state.range)}
     ${moneyCard(s, rangeLabel)}
     ${state.pro ? callbackCard(list, state.client, now) : ''}
+    ${latestCard(state.calls)}
     <section class="stats" aria-label="Call numbers">
       <div class="card stat">
         <span class="stat__label">Calls answered</span>

@@ -41,14 +41,14 @@ test('promise phrases read naturally and drive due times', () => {
   assert.equal(dueAt(call, client).toISOString(), '2026-09-25T01:00:00.000Z');
 });
 
-test('notification: says ElliotAI, then just how urgent and when to call back', () => {
+test('notification: the job urgency is the title, the callback time is the body', () => {
   const n = buildNotification(call, client);
-  assert.equal(n.title, 'ElliotAI');
-  assert.equal(n.body, 'URGENT JOB – call back within 1 hour. Tap to see details.');
+  assert.equal(n.title, 'URGENT JOB');
+  assert.equal(n.body, 'Call back within 1 hour. Tap to see details.');
   assert.equal(n.url, '/dashboard.html#leads/call-1');
-  assert.ok(!/Sarah|Banksia|Newtown/.test(n.body)); // no personal details on the lock screen
-  assert.equal(buildNotification({ ...call, urgency: 'non_urgent' }, client).body, 'Non-urgent job – call back within 4 hours. Tap to see details.');
-  assert.equal(buildNotification({ ...call, urgency: 'somewhat_urgent' }, client).body, 'Somewhat urgent job – call back within 4 hours. Tap to see details.');
+  assert.ok(!/Sarah|Banksia|Newtown/.test(n.title + n.body)); // no personal details on the lock screen
+  assert.equal(buildNotification({ ...call, urgency: 'non_urgent' }, client).title, 'Non-urgent job');
+  assert.equal(buildNotification({ ...call, urgency: 'somewhat_urgent' }, client).body, 'Call back within 4 hours. Tap to see details.');
 });
 
 test('backup text includes the number to call and a link to the lead', () => {
@@ -130,5 +130,6 @@ test('buildIcs makes a valid, escaped calendar feed', () => {
 });
 
 test('calls without an urgency still get a notification', () => {
-  assert.equal(buildNotification({ ...call, urgency: null }, client).body, 'New call – tap to see details.');
+  const n = buildNotification({ ...call, urgency: null }, client);
+  assert.deepEqual([n.title, n.body], ['New call', 'Tap to see details.']);
 });

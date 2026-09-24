@@ -70,6 +70,12 @@ function supabaseSource() {
       const { error } = await supabase.from('calls').update(patch).eq('id', id);
       if (error) throw error;
     },
+    // Returns how many were actually deleted (0 if the delete permission update isn't run yet).
+    async deleteCalls(ids) {
+      const { data, error } = await supabase.from('calls').delete().in('id', ids).select('id');
+      if (error) throw error;
+      return data?.length ?? 0;
+    },
     async bookings() {
       if (!pro) return [];
       const since = new Date(Date.now() - 60 * 86400000).toISOString();
@@ -126,6 +132,11 @@ async function demoSource() {
     members: async () => demoMembers,
     calls: async () => calls,
     transcript: async (id) => calls.find((c) => c.id === id)?.transcript ?? null,
+    async deleteCalls(ids) {
+      await pause();
+      for (const id of ids) calls.splice(calls.findIndex((c) => c.id === id), 1);
+      return ids.length;
+    },
     async updateCall(id, patch) {
       await pause();
       const call = calls.find((c) => c.id === id);

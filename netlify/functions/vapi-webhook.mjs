@@ -97,6 +97,11 @@ async function handleToolCalls({ assistantId, vapiCallId, customerNumber, calls 
     client = await findClient(assistantId).catch(() => null);
     if (!client) console.error('vapi-webhook tools: client lookup failed', err);
   }
+  // Check this line when a booking fails: it shows which tools Vapi called and whether we knew the business.
+  console.log(
+    'vapi-webhook: tools',
+    JSON.stringify({ tools: calls.map((c) => c.name), assistantId: assistantId ?? null, clientFound: Boolean(client) }),
+  );
   for (const call of calls) {
     const name = toolName(call.name);
     let result;

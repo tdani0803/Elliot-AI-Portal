@@ -3,7 +3,10 @@ import { test } from 'node:test';
 import {
   busiestTimes,
   callbackList,
+  callsPerPhone,
   customersFrom,
+  isLead,
+  monthlyTotals,
   feeForRange,
   jobTypeOf,
   suburbOf,
@@ -91,4 +94,39 @@ test('customersFrom groups by phone (+61 and 0 forms), skips spam, totals won', 
   assert.equal(customers[0].name, 'Sarah M'); // most recent name wins
   assert.equal(customers[0].wonValue, 2000);
   assert.equal(customers[0].repeat, true);
+});
+
+test('isLead: untagged calls count when real, not hang-ups or spam', () => {
+  assert.equal(isLead(call({ urgency: null, duration_seconds: 40 })), true);
+  assert.equal(isLead(call({ urgency: null, duration_seconds: 5, caller_name: 'Sam' })), true);
+  assert.equal(isLead(call({ urgency: null, duration_seconds: 5 })), false);
+  assert.equal(isLead(call({ urgency: 'irrelevant' })), false);
+});
+
+test('callsPerPhone: counts leads per number, +61 and 0 are the same', () => {
+  const counts = callsPerPhone([
+    call({ callback_number: '+61412345678' }),
+    call({ callback_number: '0412 345 678' }),
+    call({ callback_number: '0400000000', urgency: 'irrelevant' }),
+  ]);
+  assert.equal(counts.get('0412345678'), 2);
+  assert.equal(counts.has('0400000000'), false);
+});
+
+test('monthlyTotals: 12 months oldest first, with won money in the month it was won', () => {
+  const now = new Date(2026, 8, 24, 12);
+  const rows = monthlyTotals(
+    [
+      call({ call_started_at: new Date(2026, 8, 3).toISOString() }),
+      call({ call_started_at: new Date(2026, 6, 10).toISOString(), lead_status: 'won', won_value: 900, status_updated_at: new Date(2026, 7, 2).toISOString() }),
+      call({ call_started_at: new Date(2024, 0, 1).toISOString() }), // too old
+    ],
+    now,
+  );
+  assert.equal(rows.length, 12);
+  assert.equal(rows[11].calls, 1);
+  assert.equal(rows[9].calls, 1);
+  assert.equal(rows[10].won, 1);
+  assert.equal(rows[10].wonValue, 900);
+  assert.equal(rows.reduce((n, r) => n + r.calls, 0), 2);
 });

@@ -273,6 +273,10 @@ This turns ElliotAI into an app on the tradie's phone. It buzzes them for every 
 
 Same as Part 9 Step A, but with this file: `supabase/migrations/20260925000000_alerts.sql`. It's safe to run more than once.
 
+### Step A2: Run the delete update
+
+So you can delete calls and customers in the portal. Same again (**+ New query**), with this file: `supabase/migrations/20260926000000_delete.sql`. Safe to run more than once.
+
 ### Step B: Fill in 3 boxes in the client's row
 
 Go to **Supabase → Table Editor → clients**:

@@ -12,8 +12,14 @@ export const STATUSES = [
 ];
 export const OPEN_STATUSES = ['new', 'called_back', 'quoted'];
 const URGENCY_RANK = { urgent: 0, somewhat_urgent: 1, non_urgent: 2 };
+const rankOf = (urgency) => URGENCY_RANK[urgency] ?? 1.5; // untagged sits between somewhat and non-urgent
 
-export const isLead = (call) => LEAD_URGENCIES.includes(call.urgency);
+// A lead is any real enquiry. Calls Vapi didn't tag with an urgency still count if the
+// caller stayed on the line or gave details; only "irrelevant" (spam) and hang-ups don't.
+export const MIN_LEAD_SECONDS = 15;
+export const isLead = (call) =>
+  LEAD_URGENCIES.includes(call.urgency) ||
+  (call.urgency == null && ((Number(call.duration_seconds) || 0) >= MIN_LEAD_SECONDS || Boolean(call.caller_name || call.issue)));
 export const statusOf = (call) => call.lead_status ?? 'new';
 export const normalisePhone = (phone) => {
   const digits = String(phone ?? '').replace(/[^\d+]/g, '');
@@ -95,7 +101,7 @@ export function callbackList(calls, now = new Date(), client = {}) {
       const due = dueAt(c, client);
       return { ...c, ageHours, dueAt: due, overdue: now >= due };
     })
-    .sort((a, b) => URGENCY_RANK[a.urgency] - URGENCY_RANK[b.urgency] || b.ageHours - a.ageHours);
+    .sort((a, b) => rankOf(a.urgency) - rankOf(b.urgency) || b.ageHours - a.ageHours);
 }
 
 // "14 Banksia St, Newtown NSW 2042" -> "Newtown"
@@ -158,7 +164,7 @@ export function customersFrom(calls) {
   const byKey = new Map();
   const sorted = [...calls].sort((a, b) => new Date(b.call_started_at) - new Date(a.call_started_at));
   for (const call of sorted) {
-    if (call.urgency === 'irrelevant') continue; // spam and wrong numbers aren't customers
+    if (!isLead(call)) continue; // spam, wrong numbers and hang-ups aren't customers
     const key = normalisePhone(call.callback_number) || (call.caller_name ? `name:${call.caller_name.toLowerCase()}` : null);
     if (!key) continue;
     if (!byKey.has(key)) {
@@ -179,4 +185,35 @@ export function customersFrom(calls) {
     if (statusOf(call) === 'won') customer.wonValue += Number(call.won_value) || 0;
   }
   return [...byKey.values()].map((c) => ({ ...c, suburb: suburbOf(c.address), repeat: c.calls.length > 1 }));
+}
+
+// How many calls each phone number has made (for "Repeat caller" badges).
+export function callsPerPhone(calls) {
+  const counts = new Map();
+  for (const c of calls) {
+    const key = normalisePhone(c.callback_number);
+    if (key && isLead(c)) counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+// Month-by-month totals for the last `months` months (oldest first), in the viewer's time.
+export function monthlyTotals(calls, now = new Date(), months = 12) {
+  const rows = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+    const inMonth = (iso) => iso && new Date(iso) >= start && new Date(iso) < end;
+    const monthCalls = calls.filter((c) => inMonth(c.call_started_at));
+    const won = calls.filter((c) => statusOf(c) === 'won' && inMonth(c.status_updated_at ?? c.call_started_at));
+    rows.push({
+      start,
+      label: start.toLocaleDateString('en-AU', { month: 'short', year: '2-digit' }),
+      calls: monthCalls.length,
+      leads: monthCalls.filter(isLead).length,
+      won: won.length,
+      wonValue: won.reduce((sum, c) => sum + (Number(c.won_value) || 0), 0),
+    });
+  }
+  return rows;
 }

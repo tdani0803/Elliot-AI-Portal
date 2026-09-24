@@ -8,6 +8,7 @@ import {
   customersFrom,
   isLead,
   jobTypeOf,
+  monthlyTotals,
   suburbOf,
   summariseRange,
   topCounts,
@@ -36,6 +37,44 @@ function heatmap(grid) {
     )
     .join('');
   return `<div class="heatmap-wrap"><table class="heatmap"><thead><tr><td></td>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function monthByMonth(rows) {
+  const active = rows.filter((r) => r.calls > 0);
+  if (!active.length) return '<p class="muted">Your months will fill in here as calls come in.</p>';
+  // Best/worst by money won when you're marking jobs Won, otherwise by leads.
+  const score = rows.some((r) => r.wonValue > 0) ? (r) => r.wonValue : (r) => r.leads;
+  const best = active.reduce((a, b) => (score(b) > score(a) ? b : a));
+  const worst = active.length > 1 ? active.reduce((a, b) => (score(b) < score(a) ? b : a)) : null;
+  const max = Math.max(1, ...rows.map(score));
+  const byMoney = rows.some((r) => r.wonValue > 0);
+  return `
+    <p class="month-summary">Best month: <strong>${best.start.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}</strong>${
+      worst && worst !== best ? ` · Quietest: <strong>${worst.start.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}</strong>` : ''
+    }</p>
+    <div class="months" role="img" aria-label="${rows.map((r) => `${r.label}: ${r.leads} leads, ${r.won} won`).join('; ')}">
+      ${rows
+        .map(
+          (r) => `<div class="months__col${r === best ? ' months__col--best' : ''}" title="${r.label}: ${r.calls} calls, ${r.leads} leads, ${r.won} won${r.wonValue ? ` (${money(r.wonValue)})` : ''}">
+            <span class="months__value">${r === best ? (byMoney ? `$${Math.round(r.wonValue / 1000)}k` : r.leads) : ''}</span>
+            <span class="months__bar" style="height:${Math.max(3, (score(r) / max) * 100)}%"></span>
+            <span class="months__label">${r.label.slice(0, 3)}</span>
+          </div>`,
+        )
+        .join('')}
+    </div>
+    <details class="help">
+      <summary>See the numbers</summary>
+      <table class="month-table">
+        <thead><tr><th>Month</th><th>Calls</th><th>Leads</th><th>Won</th><th>$ won</th></tr></thead>
+        <tbody>${rows
+          .slice()
+          .reverse()
+          .map((r) => `<tr><td>${r.label}</td><td>${r.calls}</td><td>${r.leads}</td><td>${r.won}</td><td>${r.wonValue ? money(r.wonValue) : '–'}</td></tr>`)
+          .join('')}</tbody>
+      </table>
+    </details>
+    <p class="muted">Bars show ${byMoney ? 'money won' : 'leads'} each month.</p>`;
 }
 
 function funnel(f) {
@@ -95,6 +134,11 @@ export function render({ state, since, now }) {
         <span class="stat__value">${formatNumber(s.afterHours)}</span>
         <span class="stat__hint">${s.calls ? `${Math.round((s.afterHours / s.calls) * 100)}% of all calls` : 'While you were closed'}</span>
       </div>
+    </section>
+
+    <section class="card panel">
+      <h2 class="section-title">Month by month</h2>
+      ${monthByMonth(monthlyTotals(state.calls, now))}
     </section>
 
     <section class="card panel">

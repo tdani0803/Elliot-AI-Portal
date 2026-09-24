@@ -45,6 +45,7 @@ export const URGENCY_LABELS = {
   non_urgent: 'Non-urgent',
   irrelevant: 'Not a job',
 };
+export const UNTAGGED_LABEL = 'New call';
 
 export function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);

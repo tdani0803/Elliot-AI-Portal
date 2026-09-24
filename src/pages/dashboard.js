@@ -3,7 +3,7 @@ import '../styles/app.css';
 import { DEMO_MODE, PAGES } from '../lib/supabase.js';
 import { createDataSource } from '../lib/data.js';
 import { RANGES, rangeStart } from '../lib/metrics.js';
-import { callbackList } from '../lib/insights.js';
+import { callbackList, customersFrom } from '../lib/insights.js';
 import { escapeHtml } from '../lib/format.js';
 import {
   canPromptInstall,
@@ -51,6 +51,7 @@ const state = {
   leadFilter: 'new',
   leadSearch: '',
   customerSearch: '',
+  customerFilter: 'all',
   leadLimit: 40,
   open: new Set(), // which cards are expanded, so re-renders don't collapse them
   sticky: new Set(), // leads changed on this screen: keep showing them under the current filter
@@ -146,6 +147,27 @@ async function updateCall(id, patch, message) {
     Object.assign(call, before);
     render();
     toast("Couldn't save that. Check your internet and try again.", true);
+  }
+}
+
+async function removeCalls(ids, message) {
+  try {
+    const deleted = await data.deleteCalls(ids);
+    if (!deleted) {
+      toast('Deleting needs a quick database update first. Ask ElliotAI to switch it on.', true);
+      return;
+    }
+    state.calls = state.calls.filter((c) => !ids.includes(c.id));
+    render();
+    toast(message);
+  } catch (err) {
+    console.error(err);
+    toast(
+      /permission|policy|denied/i.test(err.message ?? '')
+        ? 'Deleting needs a quick database update first. Ask ElliotAI to switch it on.'
+        : "Couldn't delete that. Check your internet and try again.",
+      true,
+    );
   }
 }
 
@@ -335,6 +357,24 @@ const actions = {
   },
   print() {
     window.print();
+  },
+  async 'delete-call'(el) {
+    if (!confirm('Delete this call for good? This can’t be undone.')) return;
+    await removeCalls([el.dataset.id], 'Call deleted');
+  },
+  async 'delete-customer'(el) {
+    const customer = customersFrom(state.calls).find((c) => c.key === el.dataset.key);
+    if (!customer) return;
+    const count = customer.calls.length;
+    if (!confirm(`Delete ${customer.name || 'this customer'} and ${count === 1 ? 'their call' : `all ${count} of their calls`}? This can’t be undone.`)) return;
+    await removeCalls(customer.calls.map((c) => c.id), 'Customer deleted');
+  },
+  'customer-filter'(el) {
+    state.customerFilter = el.dataset.filter;
+    render();
+  },
+  'open-lead'(el) {
+    location.hash = `leads/${el.dataset.id}`;
   },
   async 'enable-push'(el) {
     el.disabled = true;

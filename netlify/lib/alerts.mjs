@@ -28,11 +28,12 @@ const MIN_SECONDS_WITHOUT_URGENCY = 15;
 
 // The lock-screen notification. Suburb only (not the full address) — lock screens are public.
 export function buildNotification(call, client) {
+  // iPhones already add "from ElliotAI" under the title, so the title is the job itself.
   const label = JOB_LABEL[call.urgency];
   const promise = promisePhrase(promiseMinutes(call.urgency, client));
   return {
-    title: 'ElliotAI',
-    body: label ? `${label} – call back ${promise}. Tap to see details.` : 'New call – tap to see details.',
+    title: label ?? 'New call',
+    body: label ? `Call back ${promise}. Tap to see details.` : 'Tap to see details.',
     url: `/dashboard.html#leads/${call.id}`,
     tag: `lead-${call.id}`,
     urgent: call.urgency === 'urgent',

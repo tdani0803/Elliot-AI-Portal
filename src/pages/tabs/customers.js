@@ -38,6 +38,7 @@ function customerCard(c, pro) {
         ${c.address ? `<p class="muted">${esc(c.address)}</p>` : ''}
         <h3 class="mini-title">History</h3>
         <ul class="history">${history}</ul>
+        <button class="link-button link-button--danger" type="button" data-action="delete-customer" data-key="${esc(c.key)}">Delete this customer and their calls</button>
       </div>
     </details>
   </li>`;
@@ -47,13 +48,24 @@ export function render({ state }) {
   const all = customersFrom(state.calls);
   const q = state.customerSearch.trim().toLowerCase();
   const digits = q.replace(/\D/g, '');
+  const CUSTOMER_FILTERS = [
+    { id: 'all', label: 'Everyone', test: () => true },
+    { id: 'repeat', label: 'Repeat callers', test: (c) => c.repeat },
+    { id: 'won', label: 'Paying customers', test: (c) => c.wonValue > 0 },
+  ];
+  const filter = CUSTOMER_FILTERS.find((f) => f.id === state.customerFilter) ?? CUSTOMER_FILTERS[0];
+  const pool = all.filter(filter.test);
+  const chips = CUSTOMER_FILTERS.map(
+    (f) =>
+      `<button type="button" class="chip" data-action="customer-filter" data-filter="${f.id}" aria-pressed="${f.id === filter.id}">${f.label} <span class="chip__count">${all.filter(f.test).length}</span></button>`,
+  ).join('');
   const filtered = q
-    ? all.filter(
+    ? pool.filter(
         (c) =>
           [c.name, c.address, c.suburb].some((v) => v && v.toLowerCase().includes(q)) ||
           (digits.length >= 3 && String(c.phone ?? '').replace(/\D/g, '').includes(digits)),
       )
-    : all;
+    : pool;
   const repeat = all.filter((c) => c.repeat).length;
 
   return `
@@ -61,6 +73,7 @@ export function render({ state }) {
       <h1 class="page-title">Customers</h1>
       <p class="hello__sub">${all.length} customer${all.length === 1 ? '' : 's'}${repeat ? ` · ${repeat} called more than once` : ''}</p>
     </section>
+    <div class="chips" role="group" aria-label="Show">${chips}</div>
     <label class="search"><span class="visually-hidden">Search customers</span>
       <input id="customer-search" type="search" data-action="search-customers" placeholder="Search name, phone or suburb" value="${esc(state.customerSearch)}" />
     </label>
@@ -68,6 +81,9 @@ export function render({ state }) {
       filtered.length
         ? `<ul class="call-list">${filtered.slice(0, LIMIT).map((c) => customerCard(c, state.pro)).join('')}</ul>
            ${filtered.length > LIMIT ? `<p class="muted center">Showing ${LIMIT} of ${filtered.length}. Search to find someone.</p>` : ''}`
-        : emptyCard(q ? 'No match' : 'No customers yet', q ? 'Try a different name, number or suburb.' : 'Everyone Elliot speaks to will be saved here.')
+        : emptyCard(
+            q ? 'No match' : filter.id === 'all' ? 'No customers yet' : 'Nobody here yet',
+            q ? 'Try a different name, number or suburb.' : filter.id === 'all' ? 'Everyone Elliot speaks to will be saved here.' : 'They’ll show up here as it happens.',
+          )
     }`;
 }

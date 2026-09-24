@@ -1,6 +1,6 @@
 // Leads: every call as a lead card with a simple status pipeline.
 import { formatDuration, formatWhen } from '../../lib/format.js';
-import { STATUSES, isLead, statusOf, suburbOf } from '../../lib/insights.js';
+import { STATUSES, callsPerPhone, isLead, normalisePhone, statusOf, suburbOf } from '../../lib/insights.js';
 import { dueAt } from '../../lib/promise.js';
 import { ICONS, esc, firstName, mapsHref, money, shortTime, smsHref, statusPill, telHref, urgencyPill } from './bits.js';
 
@@ -37,8 +37,9 @@ function dueBadge(call, client) {
   return new Date() >= due ? '<strong class="overdue">Overdue</strong>' : `<span>Call back by ${shortTime(due)}</span>`;
 }
 
-function leadCard(call, { members, client, pro }) {
+function leadCard(call, { members, client, pro }, repeats) {
   const lead = isLead(call);
+  const timesCalled = repeats.get(normalisePhone(call.callback_number)) ?? 0;
   const phone = call.callback_number;
   const reviewText = client.review_url
     ? `Hi ${firstName(call.caller_name) || 'there'}, thanks for choosing ${client.business_name}! If you were happy with the job, would you mind leaving us a quick review? ${client.review_url}`
@@ -90,11 +91,19 @@ function leadCard(call, { members, client, pro }) {
           ${pro && lead && statusOf(call) === 'new' ? dueBadge(call, client) : ''}
           ${call.won_value && statusOf(call) === 'won' ? `<span class="won-amount">${money(call.won_value)}</span>` : ''}
           ${call.assigned_to ? `<span>👷 ${esc(call.assigned_to)}</span>` : ''}
+          ${timesCalled > 1 ? `<span class="pill pill--repeat">Repeat caller · ${timesCalled} calls</span>` : ''}
         </span>
       </summary>
       <div class="call__body">
         ${call.summary ? `<p class="summary-box"><strong>Summary</strong>${esc(call.summary)}</p>` : ''}
-        ${call.recording_url ? `<audio class="recording" controls preload="none" src="${esc(call.recording_url)}"></audio>` : ''}
+        ${
+          call.recording_url
+            ? `<div class="recording-wrap">
+                <audio class="recording" controls preload="none" src="${esc(call.recording_url)}" data-recording></audio>
+                <a class="link-button recording-link" href="${esc(call.recording_url)}" target="_blank" rel="noopener">Play recording in a new tab</a>
+              </div>`
+            : ''
+        }
         ${actions.length ? `<div class="call__actions">${actions.join('')}</div>` : ''}
         ${pro && lead ? statusButtons(call) : ''}
         ${wonBox}
@@ -111,6 +120,7 @@ function leadCard(call, { members, client, pro }) {
               </label>`
             : ''
         }
+        <button class="link-button link-button--danger" type="button" data-action="delete-call" data-id="${call.id}">Delete this call</button>
         ${
           pro
             ? `<div class="transcript" data-transcript="${call.id}">
@@ -131,6 +141,7 @@ export function render({ state }) {
   // Cards you just changed stay put until you switch filters, so they don't vanish mid-edit.
   const visible = state.calls.filter((c) => filter.test(c) || state.sticky.has(c.id)).filter((c) => matches(c, state.leadSearch));
   const shown = visible.slice(0, state.leadLimit);
+  const repeats = callsPerPhone(state.calls);
 
   const chips = available
     .map(
@@ -154,7 +165,7 @@ export function render({ state }) {
       <input id="lead-search" type="search" data-action="search-leads" placeholder="Search name, phone, suburb or job" value="${esc(state.leadSearch)}" />
     </label>
     <ul class="call-list">
-      ${shown.length ? shown.map((c) => leadCard(c, state)).join('') : `<li class="card empty"><strong>${emptyText[0]}</strong>${emptyText[1]}</li>`}
+      ${shown.length ? shown.map((c) => leadCard(c, state, repeats)).join('') : `<li class="card empty"><strong>${emptyText[0]}</strong>${emptyText[1]}</li>`}
     </ul>
     ${visible.length > shown.length ? `<button class="btn btn--ghost btn--block" type="button" data-action="more-leads">Show more (${visible.length - shown.length} left)</button>` : ''}`;
 }

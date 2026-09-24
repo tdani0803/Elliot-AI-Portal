@@ -523,3 +523,32 @@
 /* Leave room for the sticky header (and tab bar on desktop) when jumping to a lead. */
 .call { scroll-margin-top: 76px; }
 @media (min-width: 720px) { .call { scroll-margin-top: 136px; } }
+
+/* Latest calls (Home) */
+.latest { padding: 18px; display: grid; gap: 10px; }
+.latest__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.latest__item {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 12px; border: 2px solid var(--ink); border-radius: var(--radius-sm);
+  background: var(--paper); color: var(--ink); text-align: left; font: inherit; cursor: pointer;
+}
+.latest__item:hover { background: var(--sky-soft); }
+.latest__main { display: grid; min-width: 0; }
+.latest__main strong, .latest__main span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.latest__side { display: grid; justify-items: end; gap: 2px; font-size: 0.8rem; flex: none; }
+
+/* Recording */
+.recording-wrap { display: grid; gap: 4px; }
+.recording-link { justify-self: start; font-size: 0.85rem; }
+
+/* Month by month (Report) */
+.month-summary { margin: 0; font-weight: 600; }
+.months { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; align-items: end; height: 170px; }
+.months__col { display: grid; grid-template-rows: auto 1fr auto; align-items: end; justify-items: center; height: 100%; gap: 2px; }
+.months__bar { width: 100%; max-width: 30px; background: var(--sky-deep); border-radius: 6px 6px 0 0; align-self: end; }
+.months__col--best .months__bar { background: var(--calm); }
+.months__value { font-size: 0.7rem; font-weight: 800; white-space: nowrap; }
+.months__label { font-size: 0.68rem; font-weight: 700; color: var(--ink-2); overflow: hidden; }
+.month-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.9rem; }
+.month-table th, .month-table td { text-align: right; padding: 6px 4px; border-bottom: 1px solid var(--neutral-soft); }
+.month-table th:first-child, .month-table td:first-child { text-align: left; }
