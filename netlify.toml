@@ -35,3 +35,14 @@
   [headers.values]
     Content-Type = "application/manifest+json"
     Cache-Control = "no-cache"
+
+# Pages always come fresh, so phones pick up new versions straight away.
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "no-cache"

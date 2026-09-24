@@ -1,5 +1,7 @@
 # ElliotAI Client Portal — Setup Guide
 
+> **Adding a new client?** Follow **[docs/NEW-CLIENT.md](docs/NEW-CLIENT.md)**, which covers everything for one business in about 30 minutes. Their script comes from **[docs/prompt-template.md](docs/prompt-template.md)**.
+
 This guide gets your client portal live on the internet.
 You don't need to know how to code. You just click and copy-paste.
 

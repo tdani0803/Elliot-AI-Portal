@@ -2,6 +2,9 @@
 import { promiseMinutes, promisePhrase } from '../../lib/promise.js';
 import { esc } from './bits.js';
 
+// eslint-disable-next-line no-undef
+const VERSION = typeof __APP_VERSION__ === 'undefined' ? 'dev' : __APP_VERSION__;
+
 function toggle(state, key, title, example) {
   const on = Boolean(state.client[key]);
   return `<li class="setting">
@@ -71,5 +74,6 @@ export function render({ state }) {
       <p class="muted">Want these changed, or your hours or prices? Just call or text ElliotAI and we'll sort it.</p>
     </section>
 
-    <button class="btn btn--ghost btn--block" type="button" data-action="logout">Log out</button>`;
+    <button class="btn btn--ghost btn--block" type="button" data-action="logout">Log out</button>
+    <p class="footer-note">Version ${VERSION}</p>`;
 }
