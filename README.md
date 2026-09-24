@@ -246,7 +246,7 @@ This turns on **Leads, Jobs, Customers and Report**. Until you do it, the websit
    | **monthly_fee** | What this client pays you each month, numbers only, like `750`. This powers "Elliot paid for itself 12×". |
    | **review_url** | Their Google review link. Used by the **Ask for review** button. |
    | **business_hours** | Leave it as is (Mon–Fri, 7am–5pm). To change it, edit the times. Use `null` for closed days. |
-   | **timezone** | Leave it as `Australia/Sydney` unless they're in another state, e.g. `Australia/Brisbane`, `Australia/Perth`. |
+   | **state** | Their state: `QLD`, `NSW`, `VIC`, `TAS`, `ACT`, `SA`, `NT` or `WA`. The **timezone** fills itself in (after running `20260927000000_state_timezone.sql`). |
 
 3. Refresh your website. You'll see the tabs at the bottom: **Home, Leads, Jobs, Customers, Report**. 🎉
 

@@ -27,29 +27,123 @@ grant delete on public.calls to authenticated;
 
 ---
 
-## Step 2: Set the time zone, call-back times and business hours (Supabase, 2 min)
+## Step 2: Let each business have its own state and time zone (Supabase, 3 min)
 
-This sets Brisbane time, "call back within 1 hour" for urgent, "within 4 hours" for everyone else,
-and the opening hours (Mon to Fri 8am to 5:30pm, Sat and Sun 9am to 3pm). Booking needs these.
+Every business can be in a different state. You pick the **state**, and Supabase sets the right time zone
+by itself (including daylight saving). Booking times, "overdue" and alerts all use it.
 
-1. Still in **SQL Editor**, click **+ New query** again (a fresh one).
+### 2A: Switch it on (only once, ever)
+1. In **SQL Editor**, click **+ New query**.
 2. Paste this whole box in:
+
+```sql
+-- ElliotAI Client Portal — pick a business's state and its time zone is set for you.
+-- Type QLD, NSW, VIC, TAS, ACT, SA, NT or WA in clients.state; clients.timezone fills itself in.
+-- Run AFTER the earlier updates. Safe to run more than once.
+
+alter table public.clients add column if not exists state text;
+
+alter table public.clients drop constraint if exists clients_state_check;
+alter table public.clients add constraint clients_state_check
+  check (state is null or state in ('QLD', 'NSW', 'VIC', 'TAS', 'ACT', 'SA', 'NT', 'WA'));
+
+-- Each state's clock. QLD has no daylight saving; NSW/VIC/TAS/ACT/SA do; NT and WA don't.
+create or replace function public.timezone_for_state(p_state text)
+returns text
+language sql
+immutable
+as $$
+  select case upper(trim(p_state))
+    when 'QLD' then 'Australia/Brisbane'
+    when 'NSW' then 'Australia/Sydney'
+    when 'ACT' then 'Australia/Sydney'
+    when 'VIC' then 'Australia/Melbourne'
+    when 'TAS' then 'Australia/Hobart'
+    when 'SA'  then 'Australia/Adelaide'
+    when 'NT'  then 'Australia/Darwin'
+    when 'WA'  then 'Australia/Perth'
+  end
+$$;
+
+-- Tidy the state ("qld " -> "QLD") and set the time zone whenever the state is filled in or changed.
+-- A business in an odd spot (e.g. Broken Hill, NSW, runs on Adelaide time) can leave state empty
+-- and type its timezone by hand.
+create or replace function public.clients_set_timezone()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.state is not null then
+    new.state := upper(trim(new.state));
+    new.timezone := coalesce(public.timezone_for_state(new.state), new.timezone);
+  end if;
+  return new;
+end
+$$;
+
+drop trigger if exists clients_set_timezone on public.clients;
+create trigger clients_set_timezone
+  before insert or update of state on public.clients
+  for each row execute function public.clients_set_timezone();
+
+-- Clients already set to a known state's time zone get their state filled in.
+update public.clients set state = case timezone
+    when 'Australia/Brisbane' then 'QLD'
+    when 'Australia/Melbourne' then 'VIC'
+    when 'Australia/Hobart' then 'TAS'
+    when 'Australia/Adelaide' then 'SA'
+    when 'Australia/Darwin' then 'NT'
+    when 'Australia/Perth' then 'WA'
+  end
+where state is null
+  and timezone in ('Australia/Brisbane', 'Australia/Melbourne', 'Australia/Hobart', 'Australia/Adelaide', 'Australia/Darwin', 'Australia/Perth');
+```
+
+3. Click **Run**. It should say **Success**. ✅
+
+### 2B: Set up a business (do this for each business)
+1. Click **+ New query**.
+2. Paste the box below.
+3. Change the **3 things marked CHANGE**:
+   - the **business name**, exactly as it's written in your clients list
+   - the **state**: one of `QLD` `NSW` `VIC` `TAS` `ACT` `SA` `NT` `WA`
+   - the **opening hours** (24-hour time; write `null` for a closed day, like `"sun":null`)
+4. Click **Run**.
 
 ```sql
 update public.clients
 set
-  timezone = 'Australia/Brisbane',
-  callback_urgent_minutes = 60,
-  callback_standard_minutes = 240,
-  business_hours = '{"mon":["08:00","17:30"],"tue":["08:00","17:30"],"wed":["08:00","17:30"],"thu":["08:00","17:30"],"fri":["08:00","17:30"],"sat":["09:00","15:00"],"sun":["09:00","15:00"]}'::jsonb
-returning business_name, timezone, callback_urgent_minutes, callback_standard_minutes;
+  state = 'QLD',                                   -- CHANGE: the state
+  callback_urgent_minutes = 60,                    -- urgent: call back within 1 hour
+  callback_standard_minutes = 240,                 -- everyone else: within 4 hours
+  business_hours = '{"mon":["08:00","17:30"],"tue":["08:00","17:30"],"wed":["08:00","17:30"],"thu":["08:00","17:30"],"fri":["08:00","17:30"],"sat":["09:00","15:00"],"sun":["09:00","15:00"]}'::jsonb   -- CHANGE: opening hours
+where business_name = 'Tysons Tiling & Roofing Specialists'   -- CHANGE: the business name
+returning business_name, state, timezone;
 ```
 
-3. Click **Run**.
-4. You should see your business in a little table with **Australia/Brisbane**, **60** and **240**. ✅
+5. You should see **1 row** with the business, its state and its time zone (e.g. **QLD, Australia/Brisbane**). ✅
+   - **No rows?** The name didn't match. Run this to see the exact names, then copy one in:
+```sql
+select business_name, state, timezone from public.clients;
+```
 
-> This changes every business in your list. That's fine right now because you only have one.
-> To close a day, write `null` instead of the times, like `"sun":null`.
+> Tip: a business in a spot with its own clock (like Broken Hill in NSW, which runs on Adelaide time)
+> can leave **state** empty and set **timezone** by hand, e.g. `timezone = 'Australia/Adelaide'`.
+
+### 2C: Match Elliot's prompt to the state
+The first line of each business's Vapi prompt tells Elliot today's date. Change the time zone in it to match:
+
+| State | Put this in the prompt's first line |
+|---|---|
+| QLD | `Australia/Brisbane` |
+| NSW, ACT | `Australia/Sydney` |
+| VIC | `Australia/Melbourne` |
+| TAS | `Australia/Hobart` |
+| SA | `Australia/Adelaide` |
+| NT | `Australia/Darwin` |
+| WA | `Australia/Perth` |
+
+The prompt in Step 3 is already set to `Australia/Brisbane` for your Queensland test business.
 
 ---
 
