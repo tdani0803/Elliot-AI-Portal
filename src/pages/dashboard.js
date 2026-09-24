@@ -89,8 +89,9 @@ function openDeepLink() {
 function render() {
   const tab = currentTab();
   const now = new Date();
+  const navTab = tab === 'customers' ? 'leads' : tab; // Customers lives under Calls
   document.querySelectorAll('[data-tab]').forEach((a) => {
-    if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page');
+    if (a.dataset.tab === navTab) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   });
   const waiting = state.pro ? callbackList(state.calls, now, state.client).length : 0;

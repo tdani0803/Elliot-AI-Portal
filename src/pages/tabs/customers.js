@@ -71,6 +71,7 @@ export function render({ state }) {
 
   return `
     <section class="page-head">
+      <a class="link-more" href="#leads">← Back to calls</a>
       <h1 class="page-title">Customers</h1>
       <p class="hello__sub">${all.length} customer${all.length === 1 ? '' : 's'}${repeat ? ` · ${repeat} called more than once` : ''}</p>
     </section>

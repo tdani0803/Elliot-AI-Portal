@@ -157,15 +157,16 @@ export function render({ state }) {
 
   return `
     <section class="page-head">
-      <h1 class="page-title">Leads</h1>
-      <p class="hello__sub">Tap a person to call them.</p>
+      <h1 class="page-title">Calls</h1>
+      <p class="hello__sub">Tap a person to see details and call them.</p>
     </section>
     <div class="chips" role="group" aria-label="Show">${chips}</div>
-    <label class="search"><span class="visually-hidden">Search leads</span>
+    <label class="search"><span class="visually-hidden">Search calls</span>
       <input id="lead-search" type="search" data-action="search-leads" placeholder="Search name, phone or job" value="${esc(state.leadSearch)}" />
     </label>
     <ul class="call-list">
       ${shown.length ? shown.map((c) => leadCard(c, state, repeats)).join('') : `<li class="card empty"><strong>${emptyText[0]}</strong>${emptyText[1]}</li>`}
     </ul>
-    ${visible.length > shown.length ? `<button class="btn btn--ghost btn--block" type="button" data-action="more-leads">Show more (${visible.length - shown.length} left)</button>` : ''}`;
+    ${visible.length > shown.length ? `<button class="btn btn--ghost btn--block" type="button" data-action="more-leads">Show more (${visible.length - shown.length} left)</button>` : ''}
+    <a class="link-more center" href="#customers">Customer list (everyone who's called, grouped by person) →</a>`;
 }

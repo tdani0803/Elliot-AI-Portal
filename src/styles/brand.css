@@ -31,6 +31,7 @@
   /* Type */
   --font-display: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-logo: 'Sora', 'Inter', system-ui, sans-serif;
 
   /* Shape: thin lines, small corners, soft shadows */
   --border: 1px solid var(--line);

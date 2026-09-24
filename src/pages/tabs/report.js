@@ -1,4 +1,4 @@
-// Report: the "your month with Elliot" page. Printable / save-as-PDF.
+// Report: a plain, printable call report (fits a couple of A4 pages; Save as PDF prints it).
 import { URGENCY_LABELS, formatDuration, formatMinutes, formatNumber, formatPercent } from '../../lib/format.js';
 import { RANGES } from '../../lib/metrics.js';
 import {
@@ -13,7 +13,7 @@ import {
   summariseRange,
   topCounts,
 } from '../../lib/insights.js';
-import { ICONS, barList, esc, money, rangeToggle } from './bits.js';
+import { ICONS, esc, money, rangeToggle } from './bits.js';
 
 function headline(s, rangeLabel) {
   const parts = [`${rangeLabel.charAt(0).toUpperCase() + rangeLabel.slice(1)}, Elliot answered <strong>${formatNumber(s.calls)}</strong> call${s.calls === 1 ? '' : 's'}`];
@@ -39,147 +39,136 @@ function heatmap(grid) {
   return `<div class="heatmap-wrap"><table class="heatmap"><thead><tr><td></td>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
-function monthByMonth(rows) {
-  const active = rows.filter((r) => r.calls > 0);
-  if (!active.length) return '<p class="muted">Your months will fill in here as calls come in.</p>';
-  // Best/worst by money won when you're marking jobs Won, otherwise by leads.
-  const score = rows.some((r) => r.wonValue > 0) ? (r) => r.wonValue : (r) => r.leads;
-  const best = active.reduce((a, b) => (score(b) > score(a) ? b : a));
-  const worst = active.length > 1 ? active.reduce((a, b) => (score(b) < score(a) ? b : a)) : null;
-  const max = Math.max(1, ...rows.map(score));
-  const byMoney = rows.some((r) => r.wonValue > 0);
-  return `
-    <p class="month-summary">Best month: <strong>${best.start.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}</strong>${
-      worst && worst !== best ? ` · Quietest: <strong>${worst.start.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' })}</strong>` : ''
-    }</p>
-    <div class="months" role="img" aria-label="${rows.map((r) => `${r.label}: ${r.leads} leads, ${r.won} won`).join('; ')}">
-      ${rows
-        .map(
-          (r) => `<div class="months__col${r === best ? ' months__col--best' : ''}" title="${r.label}: ${r.calls} calls, ${r.leads} leads, ${r.won} won${r.wonValue ? ` (${money(r.wonValue)})` : ''}">
-            <span class="months__value">${r === best ? (byMoney ? `$${Math.round(r.wonValue / 1000)}k` : r.leads) : ''}</span>
-            <span class="months__bar" style="height:${Math.max(3, (score(r) / max) * 100)}%"></span>
-            <span class="months__label">${r.label.slice(0, 3)}</span>
-          </div>`,
-        )
-        .join('')}
-    </div>
-    <details class="help">
-      <summary>See the numbers</summary>
-      <table class="month-table">
-        <thead><tr><th>Month</th><th>Calls</th><th>Leads</th><th>Won</th><th>$ won</th></tr></thead>
-        <tbody>${rows
-          .slice()
-          .reverse()
-          .map((r) => `<tr><td>${r.label}</td><td>${r.calls}</td><td>${r.leads}</td><td>${r.won}</td><td>${r.wonValue ? money(r.wonValue) : '–'}</td></tr>`)
-          .join('')}</tbody>
-      </table>
-    </details>
-    <p class="muted">Bars show ${byMoney ? 'money won' : 'leads'} each month.</p>`;
+const pct = (n, total) => (total ? `${Math.round((n / total) * 100)}%` : '–');
+const dateText = (d) => d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+
+function table(head, rows, { className = '' } = {}) {
+  if (!rows.length) return '<p class="muted">Nothing yet.</p>';
+  return `<table class="doc-table ${className}"><thead><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows
+    .map((r) => `<tr${r.className ? ` class="${r.className}"` : ''}>${r.cells.map((c) => `<td>${c}</td>`).join('')}</tr>`)
+    .join('')}</tbody></table>`;
 }
 
-function funnel(f) {
-  const steps = [
-    { label: 'Leads', count: f.leads },
-    { label: 'Called back', count: f.called_back },
-    { label: 'Got the job', count: f.won },
-  ];
-  if (!f.leads) return '<p class="muted">No leads in this period yet.</p>';
-  return barList(steps, { total: f.leads });
+function monthTable(rows) {
+  // Start from the first month with any calls, so a new client doesn't see a wall of zeros.
+  const first = rows.findIndex((r) => r.calls > 0);
+  if (first === -1) return '<p class="muted">Your months will fill in here as calls come in.</p>';
+  const shown = rows.slice(Math.min(first, rows.length - 3));
+  const byMoney = shown.some((r) => r.wonValue > 0);
+  const score = byMoney ? (r) => r.wonValue : (r) => r.leads;
+  const active = shown.filter((r) => r.calls > 0);
+  const best = active.reduce((a, b) => (score(b) > score(a) ? b : a));
+  const worst = active.length > 1 ? active.reduce((a, b) => (score(b) < score(a) ? b : a)) : null;
+  const max = Math.max(1, ...shown.map(score));
+  const long = (r) => r.start.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+  return `<p class="doc-note">Best month: <strong>${long(best)}</strong>${worst && worst !== best ? ` · Quietest: <strong>${long(worst)}</strong>` : ''} (by ${byMoney ? 'money won' : 'leads'}).</p>
+    ${table(
+      ['Month', 'Calls', 'Leads', 'Jobs won', '$ won', ''],
+      shown
+        .slice()
+        .reverse()
+        .map((r) => ({
+          className: r === best ? 'is-best' : '',
+          cells: [r.label, r.calls, r.leads, r.won, r.wonValue ? money(r.wonValue) : '–', `<span class="minibar"><span style="width:${(score(r) / max) * 100}%"></span></span>`],
+        })),
+      { className: 'doc-table--months' },
+    )}`;
 }
 
 export function render({ state, since, now }) {
-  const rangeLabel = RANGES.find((r) => r.id === state.range).label.toLowerCase();
+  const range = RANGES.find((r) => r.id === state.range);
   const s = summariseRange({ calls: state.calls, client: state.client, since, range: state.range, now });
   const ranged = state.calls.filter((c) => !since || new Date(c.call_started_at) >= since);
   const leads = ranged.filter(isLead);
   const tz = state.client.timezone ?? 'Australia/Sydney';
-  const jobTypes = topCounts(leads.map(jobTypeOf));
-  const suburbs = topCounts(leads.map((c) => suburbOf(c.address)));
+  const jobTypes = topCounts(leads.map(jobTypeOf), 8);
+  const suburbs = topCounts(leads.map((c) => suburbOf(c.address)), 5);
   const repeatCallers = customersFrom(ranged).filter((c) => c.repeat).length;
-  const printedFor = `${esc(state.client.business_name)} · ${RANGES.find((r) => r.id === state.range).label} · printed ${now.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+  const firstCall = state.calls.reduce((min, c) => Math.min(min, new Date(c.call_started_at).getTime()), now.getTime());
+  const from = since ?? new Date(firstCall);
+  const f = s.funnel;
+  const u = s.urgency;
 
-  const urgencyItems = ['urgent', 'somewhat_urgent', 'non_urgent'].map((k) => ({ label: URGENCY_LABELS[k], count: s.urgency[k] }));
+  const key = [
+    ['Calls answered', formatNumber(s.calls)],
+    ['Leads (real jobs)', formatNumber(s.leads)],
+    ['After-hours calls', `${formatNumber(s.afterHours)} (${pct(s.afterHours, s.calls)})`],
+    ['Repeat callers', formatNumber(repeatCallers)],
+    ['Total talk time', `${formatMinutes(s.totalSeconds)} min`],
+    ['Average call', s.calls ? formatDuration(s.avgSeconds) : '–'],
+    ['Jobs won', formatNumber(s.won.count)],
+    ['Money won', s.won.count ? money(s.won.value) : '–'],
+    ['Still in play (estimate)', s.open.estimate != null ? money(s.open.estimate) : '–'],
+    ['Return on Elliot', s.timesBack ? `${s.timesBack >= 10 ? Math.floor(s.timesBack) : s.timesBack.toFixed(1)}× its cost` : '–'],
+  ];
 
   return `
-    <section class="page-head page-head--row">
-      <div>
-        <h1 class="page-title">Report</h1>
-        <p class="hello__sub print-only">${printedFor}</p>
-      </div>
-      <button class="btn btn--ghost no-print" type="button" data-action="print">${ICONS.print}Save as PDF</button>
-    </section>
-    <div class="no-print">${rangeToggle(state.range)}</div>
-
-    <section class="card report-lead"><p>${headline(s, rangeLabel)}</p></section>
-
-    <section class="stats" aria-label="Money">
-      <div class="card stat">
-        <span class="stat__label">Money won</span>
-        <span class="stat__value">${s.won.count ? money(s.won.value) : '–'}</span>
-        <span class="stat__hint">${s.won.count ? `${s.won.count} job${s.won.count === 1 ? '' : 's'} you got` : 'Tap Got the job in Leads'}</span>
-      </div>
-      <div class="card stat">
-        <span class="stat__label">Still in play</span>
-        <span class="stat__value">${s.open.estimate != null ? money(s.open.estimate) : '–'}</span>
-        <span class="stat__hint">Estimate · ${s.open.count} open lead${s.open.count === 1 ? '' : 's'}</span>
-      </div>
-      <div class="card stat">
-        <span class="stat__label">Elliot paid for itself</span>
-        <span class="stat__value">${s.timesBack ? `${s.timesBack >= 10 ? Math.floor(s.timesBack) : s.timesBack.toFixed(1)}×` : '–'}</span>
-        <span class="stat__hint">${s.fee ? `Won ÷ ${money(s.fee)} fee` : 'Fee not set yet'}</span>
-      </div>
-      <div class="card stat">
-        <span class="stat__label">After-hours calls</span>
-        <span class="stat__value">${formatNumber(s.afterHours)}</span>
-        <span class="stat__hint">${s.calls ? `${Math.round((s.afterHours / s.calls) * 100)}% of all calls` : 'While you were closed'}</span>
-      </div>
+    <section class="report-bar no-print">
+      ${rangeToggle(state.range)}
+      <button class="btn btn--small" type="button" data-action="print">${ICONS.print}Save as PDF</button>
     </section>
 
-    <section class="card panel">
-      <h2 class="section-title">Month by month</h2>
-      ${monthByMonth(monthlyTotals(state.calls, now))}
-    </section>
-
-    <section class="card panel">
-      <h2 class="section-title">From call to job</h2>
-      <p class="muted">How far your ${rangeLabel} leads got.</p>
-      ${funnel(s.funnel)}
-    </section>
-
-    <div class="panel-grid">
-      <section class="card panel">
-        <h2 class="section-title">What people called about</h2>
-        ${barList(jobTypes, { total: leads.length })}
-      </section>
-      <section class="card panel">
-        <h2 class="section-title">Where calls came from</h2>
-        ${barList(suburbs, { total: leads.length })}
-      </section>
-    </div>
-
-    <section class="card panel">
-      <h2 class="section-title">Busiest times</h2>
-      <p class="muted">When your phone rings the most. Darker = more calls.</p>
-      ${heatmap(busiestTimes(ranged, tz))}
-    </section>
-
-    <div class="panel-grid">
-      <section class="card panel">
-        <h2 class="section-title">How urgent were they?</h2>
-        ${barList(urgencyItems, { total: s.leads })}
-      </section>
-      <section class="card panel">
-        <h2 class="section-title">Calls</h2>
-        <dl class="facts">
-          <div><dt>Total talk time</dt><dd>${formatMinutes(s.totalSeconds)} min</dd></div>
-          <div><dt>Average call</dt><dd>${s.calls ? formatDuration(s.avgSeconds) : '–'}</dd></div>
-          <div><dt>Repeat callers</dt><dd>${repeatCallers}</dd></div>
-          <div><dt>Not a job (spam etc.)</dt><dd>${s.calls - s.leads}</dd></div>
+    <article class="doc">
+      <header class="doc__head">
+        <div>
+          <span class="doc__brand">Elliot<span>AI</span></span>
+          <h1 class="doc__title">Call report</h1>
+        </div>
+        <dl class="doc__meta">
+          <div><dt>Business</dt><dd>${esc(state.client.business_name)}</dd></div>
+          <div><dt>Period</dt><dd>${range.label} · ${dateText(from)} – ${dateText(now)}</dd></div>
+          <div><dt>Prepared</dt><dd>${dateText(now)}</dd></div>
         </dl>
-      </section>
-    </div>
+      </header>
 
-    <p class="footer-note">"Money won" counts jobs marked Got the job. "Still in play" is an estimate based on your average job value${
-      s.avgJobValue ? ` (${money(s.avgJobValue)})` : ''
-    } and a ${formatPercent(s.conversionRate)} typical conversion rate — not a guarantee. "Paid for itself" compares money won with what Elliot costs over the same period (a part-month counts as a full month).</p>`;
+      <section class="doc__section">
+        <h2>Summary</h2>
+        <p>${headline(s, range.label.toLowerCase())}</p>
+        <table class="doc-kv"><tbody>${key.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('')}</tbody></table>
+      </section>
+
+      <section class="doc__section">
+        <h2>From call to job</h2>
+        ${
+          f.leads
+            ? table(['Stage', 'Leads', 'Of all leads'], [
+                { cells: ['Leads', f.leads, '100%'] },
+                { cells: ['Called back', f.called_back, pct(f.called_back, f.leads)] },
+                { cells: ['Got the job', f.won, pct(f.won, f.leads)] },
+                { cells: ['No job', f.lost, pct(f.lost, f.leads)] },
+              ])
+            : '<p class="muted">No leads in this period yet.</p>'
+        }
+      </section>
+
+      <div class="doc__cols">
+        <section class="doc__section">
+          <h2>What people called about</h2>
+          ${table(['Job', 'Calls', 'Share'], jobTypes.map((j) => ({ cells: [esc(j.label), j.count, pct(j.count, leads.length)] })))}
+        </section>
+        <section class="doc__section">
+          <h2>How urgent</h2>
+          ${table(['Urgency', 'Calls', 'Share'], ['urgent', 'somewhat_urgent', 'non_urgent'].map((k) => ({ cells: [URGENCY_LABELS[k], u[k], pct(u[k], s.leads)] })))}
+          <h2 class="doc__h2-gap">Where calls came from</h2>
+          ${table(['Suburb', 'Calls'], suburbs.map((x) => ({ cells: [esc(x.label), x.count] })))}
+        </section>
+      </div>
+
+      <section class="doc__section">
+        <h2>Busiest times</h2>
+        <p class="doc-note">Number of calls by day and time of day. Darker means busier.</p>
+        ${heatmap(busiestTimes(ranged, tz))}
+      </section>
+
+      <section class="doc__section">
+        <h2>Month by month</h2>
+        ${monthTable(monthlyTotals(state.calls, now))}
+      </section>
+
+      <footer class="doc__foot">
+        "Money won" counts jobs marked <em>Got the job</em>. "Still in play" is an estimate based on an average job value${
+          s.avgJobValue ? ` of ${money(s.avgJobValue)}` : ''
+        } and a ${formatPercent(s.conversionRate)} typical conversion rate, not a guarantee. "Return on Elliot" compares money won with what Elliot costs over the same period.
+      </footer>
+    </article>`;
 }
