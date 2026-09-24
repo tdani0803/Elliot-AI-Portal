@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { checkAvailability, planBooking, toolName } from '../netlify/lib/tools.mjs';
+import { checkAvailability, planBooking, readStartTime, toolName } from '../netlify/lib/tools.mjs';
 import { parseToolCalls, parseWebhook } from '../netlify/lib/parse-call.mjs';
 import { parseLocalDateTime } from '../src/lib/time.js';
 
@@ -82,4 +82,22 @@ test('end-of-call report keeps recording, transcript, summary and job type', () 
   assert.equal(row.transcript, 'AI: hi');
   assert.equal(row.summary, 'Roof leak, wants quote');
   assert.equal(row.job_type, 'Roof leak');
+});
+
+test('readStartTime copes with the formats models really send', () => {
+  const tz = 'Australia/Brisbane';
+  const at = new Date('2026-09-24T02:00:00Z');
+  const want = '2026-09-28T23:00:00.000Z'; // 9am Tue 29 Sep in Brisbane
+  for (const args of [
+    { start_time: '2026-09-29T09:00' },
+    { start_time: '2026-09-29T09:00:00.000Z' }, // stray Z still means local
+    { start_time: '2026-09-29 9:00 AM' },
+    { start_time: '2025-09-29T09:00' }, // wrong year
+    { date: '2026-09-29', time: '09:00' }, // split fields
+    { date: '2026-09-29', time: '9am' },
+  ]) {
+    assert.equal(readStartTime(args, tz, at)?.toISOString(), want, JSON.stringify(args));
+  }
+  assert.equal(readStartTime({ start_time: '2026-09-29 2:30 PM' }, tz, at)?.toISOString(), '2026-09-29T04:30:00.000Z');
+  assert.equal(readStartTime({ start_time: 'Tuesday 9am' }, tz, at), null);
 });

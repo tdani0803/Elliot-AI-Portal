@@ -698,3 +698,21 @@
   .doc-table td, .doc-kv tr { padding-top: 4px; padding-bottom: 4px; }
   .doc .heat { height: 20px; }
 }
+
+/* Delete mode: tick boxes on cards, and a bar with the Delete button kept in thumb reach. */
+.btn--danger { background: var(--urgent); border-color: var(--urgent); color: #fff; }
+.btn--danger:hover { background: #b91c1c; }
+.btn--danger:disabled { background: var(--neutral-soft); border-color: var(--line); color: var(--ink-3); opacity: 1; }
+.pick-card { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; cursor: pointer; }
+.pick-card__box { width: 22px; height: 22px; margin: 2px 0 0; flex: none; accent-color: var(--urgent); }
+.pick-card__body { flex: 1; display: grid; gap: 4px; min-width: 0; }
+.pick-card.is-picked { border-color: var(--urgent); background: var(--urgent-soft); }
+.pick-bar {
+  position: sticky; z-index: 15; bottom: calc(80px + env(safe-area-inset-bottom));
+  display: grid; gap: 8px; padding: 12px 14px;
+  background: var(--paper); border: var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.pick-bar__hint { margin: 0; font-weight: 600; }
+.pick-bar__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.pick-bar__actions .btn--danger { margin-left: auto; }
+@media (min-width: 720px) { .pick-bar { bottom: 16px; } }

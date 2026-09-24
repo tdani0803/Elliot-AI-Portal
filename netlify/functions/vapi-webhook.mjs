@@ -8,10 +8,10 @@
 
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { leadFieldsFromArgs, parseWebhook } from '../lib/parse-call.mjs';
-import { checkAvailability, dayWindow, planBooking, toolName } from '../lib/tools.mjs';
+import { checkAvailability, dayWindow, planBooking, readStartTime, toolDate, toolName } from '../lib/tools.mjs';
 import { alertIfNewLead } from '../lib/alerts.mjs';
 import { rest, restJson } from '../lib/rest.mjs';
-import { DEFAULT_TZ, parseDateOnly, parseLocalDateTime, zonedParts } from '../../src/lib/time.js';
+import { DEFAULT_TZ, formatDayInZone, formatTimeInZone } from '../../src/lib/time.js';
 
 const json = (status, body) => Response.json(body, { status });
 const PRO_COLUMNS = ['recording_url', 'transcript', 'summary', 'job_type'];
@@ -68,22 +68,28 @@ async function alertSafely(vapiCallId) {
   }
 }
 
-async function bookingsAround(client, dateLike) {
+async function bookingsAround(client, args) {
   const tz = client.timezone ?? DEFAULT_TZ;
-  const date =
-    parseDateOnly(dateLike) ??
-    (() => {
-      const start = parseLocalDateTime(dateLike, tz);
-      if (!start) return null;
-      const p = zonedParts(start, tz);
-      return { year: p.year, month: p.month, day: p.day };
-    })();
+  const date = toolDate(args, tz);
   if (!date) return [];
   const { from, to } = dayWindow(date, tz);
   return restJson(
     `bookings?select=starts_at,duration_minutes,status&client_id=eq.${client.id}&status=eq.booked` +
       `&starts_at=gte.${encodeURIComponent(from.toISOString())}&starts_at=lt.${encodeURIComponent(to.toISOString())}`,
   );
+}
+
+// If a booking can't be saved, write the time the caller wanted on their call, so the tradie
+// still sees it in the portal and can book it by hand.
+async function rememberWantedTime(client, vapiCallId, args) {
+  try {
+    const tz = client.timezone ?? DEFAULT_TZ;
+    const start = readStartTime(args, tz);
+    const when = start ? `${formatDayInZone(start, tz)} at ${formatTimeInZone(start, tz)}` : String(args.start_time ?? args.date ?? 'a time');
+    await saveCall(client.id, vapiCallId, { notes: `Wanted a booking: ${when}. Elliot couldn't save it, so please book it in.` });
+  } catch (err) {
+    console.error('vapi-webhook: could not note the wanted time', err?.message ?? err);
+  }
 }
 
 // Tools Elliot uses during a live call. Vapi expects { results: [{ toolCallId, result }] }.
@@ -120,18 +126,24 @@ async function handleToolCalls({ assistantId, vapiCallId, customerNumber, calls 
         }
         result = 'Details sent.';
       } else if (name === 'check_availability') {
-        const bookings = await bookingsAround(client, call.args.date ?? call.args.day ?? call.args.start_time);
+        const bookings = await bookingsAround(client, call.args);
         result = checkAvailability({ args: call.args, client, bookings });
+        console.log('vapi-webhook: check_availability', JSON.stringify({ date: call.args.date ?? null, reply: result }));
       } else if (name === 'book_job') {
-        const bookings = await bookingsAround(client, call.args.start_time ?? call.args.startTime ?? call.args.time);
+        const bookings = await bookingsAround(client, call.args);
         const plan = planBooking({ args: call.args, client, bookings, vapiCallId, customerNumber });
+        console.log(
+          'vapi-webhook: book_job',
+          JSON.stringify({ start_time: call.args.start_time ?? null, date: call.args.date ?? null, time: call.args.time ?? null, reply: plan.reply }),
+        );
         if (plan.booking) {
           await rest('bookings', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(plan.booking) });
         }
         result = plan.reply;
       }
     } catch (err) {
-      console.error(`vapi-webhook tool ${call.name}:`, err);
+      console.error(`vapi-webhook: ${name ?? call.name} failed:`, err?.message ?? err);
+      if (name === 'book_job' && client && vapiCallId) await rememberWantedTime(client, vapiCallId, call.args);
       result =
         name === 'save_lead'
           ? 'Details sent.'

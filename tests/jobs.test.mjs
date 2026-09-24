@@ -40,3 +40,10 @@ test('shortDetails: first sentence, lead-in dropped, cut to fit', () => {
   assert.ok(long.length <= 21 && long.endsWith('…'));
   assert.equal(shortDetails({}), '');
 });
+
+test('jobLabel: the job named first wins, not Elliot chatter later on', () => {
+  assert.equal(jobLabel({ summary: 'Caller Dani needs a roof repair. Elliot tried to lock in Tuesday at 9am but the booking failed.' }), 'Roof repair');
+  assert.equal(jobLabel({ issue: 'I need a quote for a roof restoration' }), 'Roof restoration');
+  assert.equal(jobLabel({ issue: 'locked out of the house' }), 'Locks / keys');
+  assert.equal(jobLabel({ issue: 'gutters overflowing, water in the ceiling' }), 'Gutter job');
+});

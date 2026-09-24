@@ -56,6 +56,8 @@ const state = {
   open: new Set(), // which cards are expanded, so re-renders don't collapse them
   sticky: new Set(), // leads changed on this screen: keep showing them under the current filter
   transcripts: new Map(),
+  picking: null, // 'calls' | 'customers' while choosing things to delete
+  picked: new Set(),
 };
 
 const data = await createDataSource();
@@ -370,6 +372,35 @@ const actions = {
     if (!confirm(`Delete ${customer.name || 'this customer'} and ${count === 1 ? 'their call' : `all ${count} of their calls`}? This can’t be undone.`)) return;
     await removeCalls(customer.calls.map((c) => c.id), 'Customer deleted');
   },
+  'start-pick'(el) {
+    state.picking = el.dataset.kind;
+    state.picked.clear();
+    render();
+  },
+  'stop-pick'() {
+    state.picking = null;
+    state.picked.clear();
+    render();
+  },
+  'pick-all'() {
+    const boxes = [...document.querySelectorAll('[data-action="pick"]')];
+    const allTicked = boxes.length && boxes.every((b) => state.picked.has(b.value));
+    boxes.forEach((b) => (allTicked ? state.picked.delete(b.value) : state.picked.add(b.value)));
+    render();
+  },
+  async 'delete-picked'() {
+    const n = state.picked.size;
+    if (!n) return;
+    const customers = state.picking === 'customers';
+    const ids = customers
+      ? customersFrom(state.calls).filter((c) => state.picked.has(c.key)).flatMap((c) => c.calls.map((call) => call.id))
+      : [...state.picked];
+    const what = customers ? `${n} customer${n === 1 ? '' : 's'} and all their calls` : `${n} call${n === 1 ? '' : 's'}`;
+    if (!confirm(`Delete ${what} for good? This can’t be undone.`)) return;
+    state.picking = null;
+    state.picked.clear();
+    await removeCalls(ids, `Deleted ${what}`);
+  },
   'customer-filter'(el) {
     state.customerFilter = el.dataset.filter;
     render();
@@ -443,6 +474,12 @@ $('view').addEventListener('submit', (event) => {
 
 $('view').addEventListener('change', (event) => {
   const el = event.target;
+  if (el.dataset.action === 'pick') {
+    if (el.checked) state.picked.add(el.value);
+    else state.picked.delete(el.value);
+    render();
+    return;
+  }
   if (el.dataset.action === 'assign') updateCall(el.dataset.id, { assigned_to: el.value || null }, el.value ? `Given to ${el.value}` : 'Unassigned');
   if (el.dataset.action === 'save-notes') {
     const call = state.calls.find((c) => c.id === el.dataset.id);
@@ -480,6 +517,8 @@ $('view').addEventListener(
 
 window.addEventListener('hashchange', () => {
   state.sticky.clear();
+  state.picking = null;
+  state.picked.clear();
   window.scrollTo(0, 0);
   openDeepLink();
   render();

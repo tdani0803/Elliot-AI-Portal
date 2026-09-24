@@ -2,7 +2,7 @@
 import { formatWhen } from '../../lib/format.js';
 import { customersFrom } from '../../lib/insights.js';
 import { jobLabel } from '../../lib/jobs.js';
-import { ICONS, emptyCard, esc, mapsHref, money, smsHref, statusPill, telHref } from './bits.js';
+import { ICONS, emptyCard, esc, pickBar, mapsHref, money, smsHref, statusPill, telHref } from './bits.js';
 
 const LIMIT = 100;
 
@@ -45,7 +45,22 @@ function customerCard(c, pro) {
   </li>`;
 }
 
+function pickCustomer(c, state) {
+  const picked = state.picked.has(c.key);
+  return `<li><label class="call pick-card${picked ? ' is-picked' : ''}">
+    <input type="checkbox" class="pick-card__box" data-action="pick" value="${esc(c.key)}" ${picked ? 'checked' : ''} />
+    <span class="pick-card__body">
+      <span class="call__name">${esc(c.name) || 'Unknown name'}</span>
+      <span class="call__meta">
+        ${c.phone ? `<span>${esc(c.phone)}</span>` : ''}
+        <span>${c.calls.length} call${c.calls.length === 1 ? '' : 's'}</span>
+      </span>
+    </span>
+  </label></li>`;
+}
+
 export function render({ state }) {
+  const picking = state.picking === 'customers';
   const all = customersFrom(state.calls);
   const q = state.customerSearch.trim().toLowerCase();
   const digits = q.replace(/\D/g, '');
@@ -70,10 +85,13 @@ export function render({ state }) {
   const repeat = all.filter((c) => c.repeat).length;
 
   return `
-    <section class="page-head">
-      <a class="link-more" href="#leads">← Back to calls</a>
-      <h1 class="page-title">Customers</h1>
-      <p class="hello__sub">${all.length} customer${all.length === 1 ? '' : 's'}${repeat ? ` · ${repeat} called more than once` : ''}</p>
+    <a class="link-more" href="#leads">← Back to calls</a>
+    <section class="page-head page-head--row">
+      <div>
+        <h1 class="page-title">Customers</h1>
+        <p class="hello__sub">${all.length} customer${all.length === 1 ? '' : 's'}${repeat ? ` · ${repeat} called more than once` : ''}</p>
+      </div>
+      ${picking ? '' : `<button class="btn btn--small btn--ghost" type="button" data-action="start-pick" data-kind="customers">${ICONS.trash}Delete</button>`}
     </section>
     <div class="chips" role="group" aria-label="Show">${chips}</div>
     <label class="search"><span class="visually-hidden">Search customers</span>
@@ -81,7 +99,8 @@ export function render({ state }) {
     </label>
     ${
       filtered.length
-        ? `<ul class="call-list">${filtered.slice(0, LIMIT).map((c) => customerCard(c, state.pro)).join('')}</ul>
+        ? `${picking ? pickBar(state, Math.min(filtered.length, LIMIT), 'customer') : ''}
+           <ul class="call-list">${filtered.slice(0, LIMIT).map((c) => (picking ? pickCustomer(c, state) : customerCard(c, state.pro))).join('')}</ul>
            ${filtered.length > LIMIT ? `<p class="muted center">Showing ${LIMIT} of ${filtered.length}. Search to find someone.</p>` : ''}`
         : emptyCard(
             q ? 'No match' : filter.id === 'all' ? 'No customers yet' : 'Nobody here yet',

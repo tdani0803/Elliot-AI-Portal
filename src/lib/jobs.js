@@ -36,14 +36,13 @@ const RULES = [
   [/power ?point|outlet|socket/, 'Power points'],
   [/ceiling fan|fan install/, 'Ceiling fan'],
   [/\blights?\b|lighting|downlight|\blamp/, 'Lighting'],
-  [/rewir|wiring|electric/, 'Electrical job'],
 
   // Air con / heating
   [/air ?con|a\/c|split system|ducted|heat pump|cooling|heating/, 'Air con'],
 
   // Building and outdoor trades
-  [/bathroom|ensuite|shower/, 'Bathroom job'],
-  [/kitchen|benchtop|cabinet/, 'Kitchen job'],
+  [/(bathroom|ensuite|kitchen) (reno|renovation|remodel|makeover|upgrade)|new (bathroom|ensuite)/, 'Bathroom / kitchen reno'],
+  [/new kitchen|benchtop|cabinet/, 'Kitchen job'],
   [/tiling|tiler|floor tile|wall tile|splashback|re-?grout|grout/, 'Tiling'],
   [/deck/, 'Decking'],
   [/fenc|\bgates?\b/, 'Fencing'],
@@ -54,29 +53,50 @@ const RULES = [
   [/pressure (clean|wash)|high pressure|soft wash/, 'Pressure clean'],
   [/window clean/, 'Window clean'],
   [/glass|glaz|window|mirror/, 'Glass / windows'],
-  [/lock(ed)? out|locksmith|\block|\bkeys?\b/, 'Locks / keys'],
+  [/lock(ed)? out|locksmith|(new|change|replace|broken|door|window) locks?|deadlock|keys? cut|lost (my |the )?keys|spare keys?/, 'Locks / keys'],
   [/termite|\bpests?\b|rodent|\brats?\b|\bmice\b|cockroach|spider|\bants?\b/, 'Pest control'],
   [/paint/, 'Painting'],
   [/plaster|gyprock|ceiling|wall (crack|hole)/, 'Plastering'],
   [/floor|carpet|timber|vinyl|lino/, 'Flooring'],
   [/\bdoors?\b/, 'Doors'],
   [/renovat|extension|build|granny flat/, 'Building / reno'],
+
+  // Not a job type, but still worth knowing
+];
+
+// Broad names, used only when nothing more specific was said.
+const GENERAL_RULES = [
+  [/bathroom|ensuite|shower/, 'Bathroom job'],
+  [/kitchen/, 'Kitchen job'],
   [/clean/, 'Cleaning'],
   [/leak|drip|water/, 'Leak'],
   [/roof|tile/, 'Roof repair'],
   [/plumb/, 'Plumbing job'],
+  [/rewir|wiring|electric/, 'Electrical job'],
+];
 
-  // Not a job type, but still worth knowing
+// Only used when no actual job is mentioned ("How much for a quote?").
+const WEAK_RULES = [
   [/quote|price|cost|how much/, 'Quote / price'],
   [/maintenance|service|general repair|handyman|odd job/, 'Maintenance'],
 ];
 
 export const OTHER_JOB = 'Other job';
 
+// The job mentioned FIRST wins (callers say what they need up front; later words are often
+// Elliot's own chatter like "tried to lock in a time"). Ties go to the rule listed first,
+// which is why specific jobs ("Roof leak") sit above general ones ("Roof repair").
 export function classifyJob(text) {
   const t = ` ${String(text ?? '').toLowerCase()} `;
   if (!t.trim()) return null;
-  for (const [re, label] of RULES) if (re.test(t)) return label;
+  let best = null;
+  for (const [re, label] of RULES) {
+    const at = t.search(re);
+    if (at !== -1 && (best === null || at < best.at)) best = { at, label };
+  }
+  if (best) return best.label;
+  for (const [re, label] of GENERAL_RULES) if (re.test(t)) return label;
+  for (const [re, label] of WEAK_RULES) if (re.test(t)) return label;
   return null;
 }
 

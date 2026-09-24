@@ -3,7 +3,7 @@ import { formatDuration, formatWhen } from '../../lib/format.js';
 import { jobLabel, shortDetails } from '../../lib/jobs.js';
 import { STATUSES, callsPerPhone, isLead, normalisePhone, statusOf, suburbOf } from '../../lib/insights.js';
 import { dueAt } from '../../lib/promise.js';
-import { ICONS, esc, firstName, mapsHref, money, shortTime, smsHref, statusPill, telHref, timeAgo, urgencyPill } from './bits.js';
+import { ICONS, esc, pickBar, firstName, mapsHref, money, shortTime, smsHref, statusPill, telHref, timeAgo, urgencyPill } from './bits.js';
 
 export const FILTERS = [
   { id: 'new', label: 'To call', test: (c) => isLead(c) && statusOf(c) === 'new' },
@@ -35,6 +35,34 @@ function statusButtons(call) {
 function dueBadge(call, client) {
   const due = dueAt(call, client);
   return new Date() >= due ? '<strong class="overdue">Overdue</strong>' : `<span class="due">Call by ${shortTime(due)}</span>`;
+}
+
+// Name, job, one line of detail and status: the top of every call card.
+function cardHead(call, lead, pro, client, timesCalled) {
+  return `
+        <span class="call__top">
+          <span class="call__name">${esc(call.caller_name) || 'Unknown caller'}</span>
+          ${lead ? urgencyPill(call.urgency) : '<span class="pill pill--irrelevant">Spam</span>'}
+        </span>
+        <span class="call__job">${esc(jobLabel(call) ?? 'Hung up')}</span>
+        ${shortDetails(call) ? `<span class="call__short">${esc(shortDetails(call))}</span>` : ''}
+        <span class="call__meta">
+          <span>${timeAgo(call.call_started_at)}</span>
+          ${pro && lead ? (statusOf(call) === 'new' ? dueBadge(call, client) : statusPill(call)) : ''}
+          ${call.won_value && statusOf(call) === 'won' ? `<span class="won-amount">${money(call.won_value)}</span>` : ''}
+          ${timesCalled > 1 ? `<span class="pill pill--repeat">Rang ${timesCalled} times</span>` : ''}
+        </span>`;
+}
+
+// Delete mode: the same card as a tick box.
+function pickCard(call, state, repeats) {
+  const lead = isLead(call);
+  const timesCalled = repeats.get(normalisePhone(call.callback_number)) ?? 0;
+  const picked = state.picked.has(call.id);
+  return `<li><label class="call pick-card${picked ? ' is-picked' : ''}">
+    <input type="checkbox" class="pick-card__box" data-action="pick" value="${call.id}" ${picked ? 'checked' : ''} />
+    <span class="pick-card__body">${cardHead(call, lead, state.pro, state.client, timesCalled)}</span>
+  </label></li>`;
 }
 
 function leadCard(call, { members, client, pro }, repeats) {
@@ -79,18 +107,7 @@ function leadCard(call, { members, client, pro }, repeats) {
   return `<li>
     <details class="call" data-id="${call.id}">
       <summary>
-        <span class="call__top">
-          <span class="call__name">${esc(call.caller_name) || 'Unknown caller'}</span>
-          ${lead ? urgencyPill(call.urgency) : '<span class="pill pill--irrelevant">Spam</span>'}
-        </span>
-        <span class="call__job">${esc(jobLabel(call) ?? 'Hung up')}</span>
-        ${shortDetails(call) ? `<span class="call__short">${esc(shortDetails(call))}</span>` : ''}
-        <span class="call__meta">
-          <span>${timeAgo(call.call_started_at)}</span>
-          ${pro && lead ? (statusOf(call) === 'new' ? dueBadge(call, client) : statusPill(call)) : ''}
-          ${call.won_value && statusOf(call) === 'won' ? `<span class="won-amount">${money(call.won_value)}</span>` : ''}
-          ${timesCalled > 1 ? `<span class="pill pill--repeat">Rang ${timesCalled} times</span>` : ''}
-        </span>
+${cardHead(call, lead, pro, client, timesCalled)}
       </summary>
       <div class="call__body">
         ${actions.length ? `<div class="call__actions">${actions.join('')}</div>` : ''}
@@ -142,6 +159,7 @@ export function render({ state }) {
   const visible = state.calls.filter((c) => filter.test(c) || state.sticky.has(c.id)).filter((c) => matches(c, state.leadSearch));
   const shown = visible.slice(0, state.leadLimit);
   const repeats = callsPerPhone(state.calls);
+  const picking = state.picking === 'calls';
 
   const chips = available
     .map(
@@ -156,16 +174,24 @@ export function render({ state }) {
   }[filter.id] ?? ['Nothing here', 'Leads will show up here as Elliot answers calls.'];
 
   return `
-    <section class="page-head">
-      <h1 class="page-title">Calls</h1>
-      <p class="hello__sub">Tap a person to see details and call them.</p>
+    <section class="page-head page-head--row">
+      <div>
+        <h1 class="page-title">Calls</h1>
+        <p class="hello__sub">Tap a person to see details and call them.</p>
+      </div>
+      ${picking ? '' : `<button class="btn btn--small btn--ghost" type="button" data-action="start-pick" data-kind="calls">${ICONS.trash}Delete</button>`}
     </section>
     <div class="chips" role="group" aria-label="Show">${chips}</div>
     <label class="search"><span class="visually-hidden">Search calls</span>
       <input id="lead-search" type="search" data-action="search-leads" placeholder="Search name, phone or job" value="${esc(state.leadSearch)}" />
     </label>
+    ${picking ? pickBar(state, shown.length, 'call') : ''}
     <ul class="call-list">
-      ${shown.length ? shown.map((c) => leadCard(c, state, repeats)).join('') : `<li class="card empty"><strong>${emptyText[0]}</strong>${emptyText[1]}</li>`}
+      ${
+        shown.length
+          ? shown.map((c) => (picking ? pickCard(c, state, repeats) : leadCard(c, state, repeats))).join('')
+          : `<li class="card empty"><strong>${emptyText[0]}</strong>${emptyText[1]}</li>`
+      }
     </ul>
     ${visible.length > shown.length ? `<button class="btn btn--ghost btn--block" type="button" data-action="more-leads">Show more (${visible.length - shown.length} left)</button>` : ''}
     <a class="link-more center" href="#customers">Customer list (everyone who's called, grouped by person) →</a>`;

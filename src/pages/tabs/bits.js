@@ -67,6 +67,19 @@ export function barList(items, { total, format = (n) => n } = {}) {
     .join('')}</ul>`;
 }
 
+// The bar shown while choosing things to delete. `noun` is "call" or "customer".
+export function pickBar(state, shownCount, noun) {
+  const n = state.picked.size;
+  return `<div class="pick-bar" role="region" aria-label="Delete">
+    <p class="pick-bar__hint">${n ? `<strong>${n}</strong> ${noun}${n === 1 ? '' : 's'} ticked` : `Tick the ${noun}s you want to delete.`}</p>
+    <div class="pick-bar__actions">
+      <button class="btn btn--small btn--ghost" type="button" data-action="pick-all">${n && n === shownCount ? 'Untick all' : 'Tick all'}</button>
+      <button class="btn btn--small btn--ghost" type="button" data-action="stop-pick">Cancel</button>
+      <button class="btn btn--small btn--danger" type="button" data-action="delete-picked" ${n ? '' : 'disabled'}>${ICONS.trash}Delete${n ? ` ${n}` : ''}</button>
+    </div>
+  </div>`;
+}
+
 export const ICONS = {
   phone: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>',
   text: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>',
@@ -74,5 +87,6 @@ export const ICONS = {
   plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
   pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
   star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>',
   print: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6M7 17H4v-7h16v7h-3M7 14h10v7H7z"/></svg>',
 };
