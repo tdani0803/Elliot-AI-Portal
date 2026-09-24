@@ -393,7 +393,7 @@ Want clients to log in at `portal.elliotai.com.au`?
 
 ## Changing the logo
 
-The logo is the file `public/logo.png`. To change it, upload a new picture with the **same name** on GitHub. Netlify updates the website by itself.
+The logo in the portal is plain text (**ElliotAI** next to a white **E** box), so it always looks sharp. `public/logo.png` is a picture of the same logo for your website, emails or socials. The phone app icon is `public/icon-512.png` (and the other `icon-` files).
 
 ---
 

@@ -107,7 +107,7 @@ curl -X POST http://localhost:8888/api/vapi-webhook \
 ```
 
 ## Before going live
-- The logo is `public/logo.png` and the browser icon is `public/favicon.png`. To change them, replace the files and keep the same names.
+- The portal logo is an HTML/CSS wordmark (`.wordmark` in `src/styles/app.css`). `public/logo.png` is the same logo as an image for other uses. The browser icon is `public/favicon.png`, and the app icons are `public/icon-*.png` and `public/apple-touch-icon.png`. Brand colours live in `src/styles/brand.css`.
 - Run through the whole flow with a test client: invite → set password → make a real call → it shows up on the dashboard.
 
 ## Deliberately left out
