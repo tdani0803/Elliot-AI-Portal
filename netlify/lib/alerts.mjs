@@ -14,24 +14,25 @@ const CALL_FIELDS = 'id,client_id,caller_name,issue,address,urgency,callback_num
 const siteUrl = () => (process.env.PORTAL_URL || process.env.URL || '').replace(/\/$/, '');
 export const leadLink = (callId) => `${siteUrl()}/dashboard.html#leads/${callId}`;
 
-const URGENCY_TITLE = {
-  urgent: 'URGENT – New lead',
-  somewhat_urgent: 'New lead (somewhat urgent)',
-  non_urgent: 'New lead (not urgent)',
+// What the lock screen says. Kept short and glanceable: how urgent + when to call back.
+// No names or addresses on the lock screen — those are one tap away.
+const JOB_LABEL = {
+  urgent: 'URGENT JOB',
+  somewhat_urgent: 'Somewhat urgent job',
+  non_urgent: 'Non-urgent job',
 };
+
 // Calls where Vapi didn't give an urgency still alert (better an extra buzz than a missed job),
 // as long as the caller stayed on the line long enough to be a real enquiry.
 const MIN_SECONDS_WITHOUT_URGENCY = 15;
 
 // The lock-screen notification. Suburb only (not the full address) — lock screens are public.
 export function buildNotification(call, client) {
-  const name = call.caller_name?.trim() || 'Unknown caller';
-  const suburb = suburbOf(call.address);
-  const what = [call.issue?.trim() || 'No reason given', suburb].filter(Boolean).join(', ');
+  const label = JOB_LABEL[call.urgency];
   const promise = promisePhrase(promiseMinutes(call.urgency, client));
   return {
-    title: `${URGENCY_TITLE[call.urgency] ?? 'New call'}: ${name}`,
-    body: `Elliot just answered a call. ${what}. We told them you'd call back ${promise}.`,
+    title: 'ElliotAI',
+    body: label ? `${label} – call back ${promise}. Tap to see details.` : 'New call – tap to see details.',
     url: `/dashboard.html#leads/${call.id}`,
     tag: `lead-${call.id}`,
     urgent: call.urgency === 'urgent',
@@ -39,10 +40,14 @@ export function buildNotification(call, client) {
   };
 }
 
+// The backup text can't be tapped into the app as easily, so it carries the key details.
 export function buildSms(call, client) {
-  const n = buildNotification(call, client);
+  const label = JOB_LABEL[call.urgency] ?? 'New call';
+  const name = call.caller_name?.trim() || 'Unknown caller';
+  const what = [call.issue?.trim(), suburbOf(call.address)].filter(Boolean).join(', ');
+  const promise = promisePhrase(promiseMinutes(call.urgency, client));
   const phone = call.callback_number ? ` Call them: ${call.callback_number}.` : '';
-  return `${n.title}. ${n.body.replace('Elliot just answered a call. ', '')}${phone} Open: ${leadLink(call.id)}`;
+  return `ElliotAI: ${label} from ${name}${what ? ` – ${what}` : ''}. We told them you'd call back ${promise}.${phone} Open: ${leadLink(call.id)}`;
 }
 
 // "0412 345 678" / "61412345678" / "+61 412 345 678" -> "+61412345678"

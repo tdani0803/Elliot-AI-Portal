@@ -41,19 +41,19 @@ test('promise phrases read naturally and drive due times', () => {
   assert.equal(dueAt(call, client).toISOString(), '2026-09-25T01:00:00.000Z');
 });
 
-test('notification: urgency first, suburb not full address, the promise, no emojis', () => {
+test('notification: says ElliotAI, then just how urgent and when to call back', () => {
   const n = buildNotification(call, client);
-  assert.equal(n.title, 'URGENT – New lead: Sarah Mitchell');
-  assert.equal(n.body, "Elliot just answered a call. Roof leak over kitchen, Newtown. We told them you'd call back within 1 hour.");
+  assert.equal(n.title, 'ElliotAI');
+  assert.equal(n.body, 'URGENT JOB – call back within 1 hour. Tap to see details.');
   assert.equal(n.url, '/dashboard.html#leads/call-1');
-  assert.ok(!/Banksia/.test(n.body));
-  assert.equal(buildNotification({ ...call, urgency: 'non_urgent', caller_name: null, address: null }, client).title, 'New lead (not urgent): Unknown caller');
-  assert.match(buildNotification({ ...call, urgency: 'non_urgent' }, client).body, /within 4 hours\.$/);
+  assert.ok(!/Sarah|Banksia|Newtown/.test(n.body)); // no personal details on the lock screen
+  assert.equal(buildNotification({ ...call, urgency: 'non_urgent' }, client).body, 'Non-urgent job – call back within 4 hours. Tap to see details.');
+  assert.equal(buildNotification({ ...call, urgency: 'somewhat_urgent' }, client).body, 'Somewhat urgent job – call back within 4 hours. Tap to see details.');
 });
 
 test('backup text includes the number to call and a link to the lead', () => {
   const sms = buildSms(call, client);
-  assert.match(sms, /^URGENT – New lead: Sarah Mitchell\. Roof leak over kitchen, Newtown\./);
+  assert.match(sms, /^ElliotAI: URGENT JOB from Sarah Mitchell – Roof leak over kitchen, Newtown\. We told them you'd call back within 1 hour\./);
   assert.match(sms, /Call them: 0400 111 222\./);
   assert.match(sms, /Open: https:\/\/portal\.example\.com\/dashboard\.html#leads\/call-1$/);
 });
@@ -96,7 +96,7 @@ test('alertIfNewLead: claims once, pushes, and texts only when no phone got it',
   const twilio = log.find((l) => l.url.includes('api.twilio.com'));
   const params = new URLSearchParams(String(twilio.body));
   assert.equal(params.get('To'), '+61412345678');
-  assert.match(params.get('Body'), /^URGENT – New lead: Sarah Mitchell/);
+  assert.match(params.get('Body'), /^ElliotAI: URGENT JOB from Sarah Mitchell/);
   const claim = log.find((l) => l.url.includes('calls?vapi_call_id'));
   assert.match(decodeURIComponent(claim.url), /notified_at=is\.null&or=\(urgency\.in\.\(urgent,somewhat_urgent,non_urgent\),and\(urgency\.is\.null,duration_seconds\.gte\.15\)\)/);
 });
@@ -129,6 +129,6 @@ test('buildIcs makes a valid, escaped calendar feed', () => {
   assert.ok(long.split('\r\n').every((line) => Buffer.byteLength(line) <= 75));
 });
 
-test('calls without an urgency still get a notification titled "New call"', () => {
-  assert.equal(buildNotification({ ...call, urgency: null }, client).title, 'New call: Sarah Mitchell');
+test('calls without an urgency still get a notification', () => {
+  assert.equal(buildNotification({ ...call, urgency: null }, client).body, 'New call – tap to see details.');
 });

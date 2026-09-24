@@ -200,11 +200,7 @@ Both tools only offer times inside `business_hours` that don't overlap a booked 
 
 The claim-by-PATCH on `sms_sent_at` stops the same lead being texted twice. Opening a lead in the portal, including by tapping the notification, sets `alert_opened_at`.
 
-**Notification text:**
-- Title: `URGENT – New lead: Sarah Mitchell`, or `New lead (not urgent): …` / `(somewhat urgent)`.
-- Body: "Elliot just answered a call. Roof leak over kitchen, Newtown. We told them you'd call back within 1 hour."
-
-Only the suburb goes on the lock screen, never the full address. Push notifications are plain text, so the urgency goes first in capitals.
+**Notification text:** the title is always `ElliotAI`. The body says only how urgent it is and when to call back, for example `URGENT JOB – call back within 30 minutes. Tap to see details.` There are no names or addresses on the lock screen; tapping opens the lead. The backup text keeps the key details (name, issue, suburb, number), because it can't open the app.
 
 **VAPID keys:** these are generated on first use and stored in `app_secrets`, a table only the service role can read. Set `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` in Netlify to override. `VAPID_SUBJECT` defaults to `mailto:alerts@elliotai.com.au`.
 

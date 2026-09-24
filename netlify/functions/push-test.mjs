@@ -14,8 +14,8 @@ export default async (req) => {
   for (const sub of subs) {
     try {
       await sendPush(sub, {
-        title: 'Test: notifications are working',
-        body: "This is what a new lead will look like. You're all set.",
+        title: 'ElliotAI',
+        body: "Test – notifications are working. New jobs will show up like this.",
         url: '/dashboard.html#home',
         tag: 'elliot-test',
       });
