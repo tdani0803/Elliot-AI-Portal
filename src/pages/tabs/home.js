@@ -2,6 +2,7 @@
 import { formatMinutes, formatNumber, formatPercent } from '../../lib/format.js';
 import { RANGES } from '../../lib/metrics.js';
 import { callbackList, isLead, summariseRange } from '../../lib/insights.js';
+import { jobLabel, shortDetails } from '../../lib/jobs.js';
 import { promiseMinutes, promisePhrase } from '../../lib/promise.js';
 import { ICONS, esc, money, rangeToggle, shortTime, telHref, timeAgo, urgencyPill } from './bits.js';
 
@@ -21,7 +22,7 @@ function moneyCard(s, rangeLabel) {
       <span class="hero__value">${money(s.won.value)}</span>
       <p class="hero__line">${s.won.count} job${s.won.count === 1 ? '' : 's'} won ${rangeLabel}.${times}</p>
       ${inPlay}
-      <p class="hero__fineprint">"Won" is the jobs you marked as Won in Leads.${assumptions && inPlay ? ` "In play" is an estimate ${assumptions}.` : ''}</p>
+      <p class="hero__fineprint">"Won" is the jobs you marked <strong>Got the job</strong> in Leads.${assumptions && inPlay ? ` "In play" is an estimate ${assumptions}.` : ''}</p>
     </section>`;
   }
 
@@ -36,7 +37,7 @@ function moneyCard(s, rangeLabel) {
     <span class="hero__label">Estimated value captured</span>
     <span class="hero__value">${money(s.estimateAll)}</span>
     <p class="hero__saved">Money saved: <strong>~${money(s.estimateAll)}</strong> — what you'd likely have lost if these calls went unanswered.</p>
-    <p class="hero__fineprint">Estimate ${assumptions}. Tip: mark jobs as <strong>Won</strong> in Leads to see real money here.</p>
+    <p class="hero__fineprint">Estimate ${assumptions}. Tip: tap <strong>Got the job</strong> in Leads to see real money here.</p>
   </section>`;
 }
 
@@ -50,9 +51,9 @@ function latestCard(calls) {
         (c) => `<li><button type="button" class="latest__item" data-action="open-lead" data-id="${c.id}">
           <span class="latest__main">
             <strong>${esc(c.caller_name) || 'Unknown caller'}</strong>
-            <span class="muted">${esc(c.issue) || 'No reason given'}</span>
+            <span class="muted">${esc(jobLabel(c) ?? 'Hung up')}</span>
           </span>
-          <span class="latest__side">${isLead(c) ? urgencyPill(c.urgency) : '<span class="pill pill--irrelevant">Not a job</span>'}<span class="muted">${timeAgo(c.call_started_at)}</span></span>
+          <span class="latest__side">${isLead(c) ? urgencyPill(c.urgency) : '<span class="pill pill--irrelevant">Spam</span>'}<span class="muted">${timeAgo(c.call_started_at)}</span></span>
         </button></li>`,
       )
       .join('')}</ul>
@@ -61,9 +62,9 @@ function latestCard(calls) {
 }
 
 function dueText(c, client, now) {
-  if (c.overdue) return `<strong class="overdue">Overdue</strong> · we told them ${promisePhrase(promiseMinutes(c.urgency, client))}`;
+  if (c.overdue) return `<strong class="overdue">Overdue</strong> · we said ${promisePhrase(promiseMinutes(c.urgency, client))}`;
   const sameDay = c.dueAt.toDateString() === now.toDateString();
-  return `Call back by ${shortTime(c.dueAt)}${sameDay ? '' : ` ${c.dueAt.toLocaleDateString('en-AU', { weekday: 'short' })}`}`;
+  return `Call by ${shortTime(c.dueAt)}${sameDay ? '' : ` ${c.dueAt.toLocaleDateString('en-AU', { weekday: 'short' })}`}`;
 }
 
 function callbackCard(list, client, now) {
@@ -79,8 +80,9 @@ function callbackCard(list, client, now) {
       (c) => `<li class="todo__item${c.overdue ? ' todo__item--overdue' : ''}">
         <div class="todo__text">
           <span class="todo__name">${esc(c.caller_name) || 'Unknown caller'} ${urgencyPill(c.urgency)}</span>
-          <span class="todo__issue">${esc(c.issue) || 'No reason given'}</span>
-          <span class="todo__meta">Called ${timeAgo(c.call_started_at)} · ${dueText(c, client, now)}</span>
+          <span class="todo__job">${esc(jobLabel(c) ?? 'Job')}</span>
+          ${shortDetails(c) ? `<span class="todo__issue">${esc(shortDetails(c))}</span>` : ''}
+          <span class="todo__meta">${timeAgo(c.call_started_at)} · ${dueText(c, client, now)}</span>
         </div>
         <div class="todo__actions">
           ${c.callback_number ? `<a class="btn btn--small" href="${telHref(c.callback_number)}">${ICONS.phone}Call</a>` : ''}
@@ -91,7 +93,7 @@ function callbackCard(list, client, now) {
     .join('');
   return `<section class="card todo" aria-labelledby="todo-title">
     <div class="todo__head">
-      <h2 class="section-title" id="todo-title">Call these people back</h2>
+      <h2 class="section-title" id="todo-title">Call these people</h2>
       <span class="count-badge">${list.length}</span>
     </div>
     <ul class="todo__list">${items}</ul>

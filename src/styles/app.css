@@ -375,7 +375,7 @@
 .summary-box strong { display: block; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px; }
 .recording { width: 100%; height: 44px; }
 .status-row {
-  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px;
   padding: 3px; border: 2px solid var(--ink); border-radius: 14px; background: var(--bg);
 }
 .status-btn {
@@ -552,3 +552,14 @@
 .month-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.9rem; }
 .month-table th, .month-table td { text-align: right; padding: 6px 4px; border-bottom: 1px solid var(--neutral-soft); }
 .month-table th:first-child, .month-table td:first-child { text-align: left; }
+
+/* Simple lead cards: name, job, one line of detail. */
+.call__job, .todo__job { font: 800 1.05rem/1.25 var(--font-display); color: var(--ink); }
+.call__short { color: var(--ink-2); overflow-wrap: anywhere; }
+.todo__issue { font-weight: 400; color: var(--ink-2); }
+.call__meta .due { font-weight: 700; color: var(--ink-2); }
+.more { border-top: 2px dashed var(--neutral-soft); padding-top: 8px; }
+.more > summary { cursor: pointer; font-weight: 700; color: var(--ink-2); padding: 6px 0; }
+.more__body { display: grid; gap: 10px; padding-top: 6px; }
+.more__body > * { min-width: 0; }
+.status-btn { font-size: 0.95rem; min-height: 44px; }

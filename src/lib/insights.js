@@ -2,15 +2,16 @@
 import { LEAD_URGENCIES, estimatedValue } from './metrics.js';
 import { DEFAULT_HOURS, DEFAULT_TZ, isAfterHours, zonedParts } from './time.js';
 import { dueAt } from './promise.js';
+import { jobLabel } from './jobs.js';
 
+// Kept to four plain steps. Old "quoted" leads show as "Called" (see statusOf).
 export const STATUSES = [
-  { id: 'new', label: 'Needs a call back', short: 'New' },
-  { id: 'called_back', label: 'Called back', short: 'Called' },
-  { id: 'quoted', label: 'Quoted', short: 'Quoted' },
-  { id: 'won', label: 'Won', short: 'Won' },
-  { id: 'lost', label: 'Lost', short: 'Lost' },
+  { id: 'new', label: 'To call', short: 'To call' },
+  { id: 'called_back', label: 'Called', short: 'Called' },
+  { id: 'won', label: 'Got the job', short: 'Got the job' },
+  { id: 'lost', label: 'No job', short: 'No job' },
 ];
-export const OPEN_STATUSES = ['new', 'called_back', 'quoted'];
+export const OPEN_STATUSES = ['new', 'called_back'];
 const URGENCY_RANK = { urgent: 0, somewhat_urgent: 1, non_urgent: 2 };
 const rankOf = (urgency) => URGENCY_RANK[urgency] ?? 1.5; // untagged sits between somewhat and non-urgent
 
@@ -20,7 +21,7 @@ export const MIN_LEAD_SECONDS = 15;
 export const isLead = (call) =>
   LEAD_URGENCIES.includes(call.urgency) ||
   (call.urgency == null && ((Number(call.duration_seconds) || 0) >= MIN_LEAD_SECONDS || Boolean(call.caller_name || call.issue)));
-export const statusOf = (call) => call.lead_status ?? 'new';
+export const statusOf = (call) => (call.lead_status === 'quoted' ? 'called_back' : call.lead_status ?? 'new');
 export const normalisePhone = (phone) => {
   const digits = String(phone ?? '').replace(/[^\d+]/g, '');
   return digits.startsWith('+61') ? `0${digits.slice(3)}` : digits;
@@ -59,8 +60,7 @@ export function summariseRange({ calls, client, since, range, now = new Date() }
 
   const funnel = {
     leads: leads.length,
-    called_back: leads.filter((c) => ['called_back', 'quoted', 'won'].includes(statusOf(c))).length,
-    quoted: leads.filter((c) => ['quoted', 'won'].includes(statusOf(c))).length,
+    called_back: leads.filter((c) => ['called_back', 'won'].includes(statusOf(c))).length,
     won: leads.filter((c) => statusOf(c) === 'won').length,
     lost: leads.filter((c) => statusOf(c) === 'lost').length,
   };
@@ -121,13 +121,8 @@ export function suburbOf(address) {
   return null;
 }
 
-// Prefer the job type Elliot tagged; fall back to a tidied version of the issue.
-export function jobTypeOf(call) {
-  const raw = call.job_type || call.issue;
-  if (!raw) return null;
-  const text = String(raw).trim().replace(/\s+/g, ' ');
-  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
-}
+// Short job name ("Roof leak", "Blocked drain") for charts and lead cards.
+export const jobTypeOf = jobLabel;
 
 export function topCounts(items, n = 6) {
   const counts = new Map();

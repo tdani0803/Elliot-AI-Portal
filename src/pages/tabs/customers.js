@@ -1,6 +1,7 @@
 // Customers: everyone who has called, grouped by phone number, with their history.
 import { formatWhen } from '../../lib/format.js';
 import { customersFrom } from '../../lib/insights.js';
+import { jobLabel } from '../../lib/jobs.js';
 import { ICONS, emptyCard, esc, mapsHref, money, smsHref, statusPill, telHref } from './bits.js';
 
 const LIMIT = 100;
@@ -10,7 +11,7 @@ function customerCard(c, pro) {
     .map(
       (call) => `<li class="history__item">
         <span class="history__when">${formatWhen(call.call_started_at)}</span>
-        <span class="history__what">${esc(call.issue) || 'No reason given'}</span>
+        <span class="history__what">${esc(jobLabel(call) ?? 'Call')}</span>
         ${pro ? statusPill(call) : ''}
       </li>`,
     )

@@ -1,16 +1,16 @@
 // Leads: every call as a lead card with a simple status pipeline.
 import { formatDuration, formatWhen } from '../../lib/format.js';
+import { jobLabel, shortDetails } from '../../lib/jobs.js';
 import { STATUSES, callsPerPhone, isLead, normalisePhone, statusOf, suburbOf } from '../../lib/insights.js';
 import { dueAt } from '../../lib/promise.js';
-import { ICONS, esc, firstName, mapsHref, money, shortTime, smsHref, statusPill, telHref, urgencyPill } from './bits.js';
+import { ICONS, esc, firstName, mapsHref, money, shortTime, smsHref, statusPill, telHref, timeAgo, urgencyPill } from './bits.js';
 
 export const FILTERS = [
-  { id: 'new', label: 'Call back', test: (c) => isLead(c) && statusOf(c) === 'new' },
+  { id: 'new', label: 'To call', test: (c) => isLead(c) && statusOf(c) === 'new' },
   { id: 'called_back', label: 'Called', test: (c) => isLead(c) && statusOf(c) === 'called_back' },
-  { id: 'quoted', label: 'Quoted', test: (c) => isLead(c) && statusOf(c) === 'quoted' },
-  { id: 'won', label: 'Won', test: (c) => isLead(c) && statusOf(c) === 'won' },
-  { id: 'lost', label: 'Lost', test: (c) => isLead(c) && statusOf(c) === 'lost' },
-  { id: 'spam', label: 'Not a job', test: (c) => !isLead(c) },
+  { id: 'won', label: 'Got the job', test: (c) => isLead(c) && statusOf(c) === 'won' },
+  { id: 'lost', label: 'No job', test: (c) => isLead(c) && statusOf(c) === 'lost' },
+  { id: 'spam', label: 'Spam', test: (c) => !isLead(c) },
   { id: 'all', label: 'All', test: () => true },
 ];
 
@@ -19,7 +19,7 @@ function matches(call, query) {
   const q = query.toLowerCase();
   const digits = q.replace(/\D/g, '');
   return (
-    [call.caller_name, call.issue, call.address, call.job_type, suburbOf(call.address)].some((v) => v && v.toLowerCase().includes(q)) ||
+    [call.caller_name, call.issue, call.address, call.job_type, jobLabel(call), suburbOf(call.address)].some((v) => v && v.toLowerCase().includes(q)) ||
     (digits.length >= 3 && String(call.callback_number ?? '').replace(/\D/g, '').includes(digits))
   );
 }
@@ -34,7 +34,7 @@ function statusButtons(call) {
 
 function dueBadge(call, client) {
   const due = dueAt(call, client);
-  return new Date() >= due ? '<strong class="overdue">Overdue</strong>' : `<span>Call back by ${shortTime(due)}</span>`;
+  return new Date() >= due ? '<strong class="overdue">Overdue</strong>' : `<span class="due">Call by ${shortTime(due)}</span>`;
 }
 
 function leadCard(call, { members, client, pro }, repeats) {
@@ -44,7 +44,7 @@ function leadCard(call, { members, client, pro }, repeats) {
   const reviewText = client.review_url
     ? `Hi ${firstName(call.caller_name) || 'there'}, thanks for choosing ${client.business_name}! If you were happy with the job, would you mind leaving us a quick review? ${client.review_url}`
     : '';
-  const followUpText = `Hi ${firstName(call.caller_name) || 'there'}, it's ${client.business_name} following up on your enquiry about ${call.issue ? call.issue.toLowerCase() : 'your job'}. When suits for a chat?`;
+  const followUpText = `Hi ${firstName(call.caller_name) || 'there'}, it's ${client.business_name} following up about your ${(jobLabel(call) ?? 'job').toLowerCase()}. When suits for a chat?`;
 
   const actions = [
     phone && `<a class="btn btn--small" href="${telHref(phone)}">${ICONS.phone}Call</a>`,
@@ -81,53 +81,53 @@ function leadCard(call, { members, client, pro }, repeats) {
       <summary>
         <span class="call__top">
           <span class="call__name">${esc(call.caller_name) || 'Unknown caller'}</span>
-          ${lead ? urgencyPill(call.urgency) : '<span class="pill pill--irrelevant">Not a job</span>'}
+          ${lead ? urgencyPill(call.urgency) : '<span class="pill pill--irrelevant">Spam</span>'}
         </span>
-        <span class="call__issue">${esc(call.issue) || 'No reason given'}</span>
+        <span class="call__job">${esc(jobLabel(call) ?? 'Hung up')}</span>
+        ${shortDetails(call) ? `<span class="call__short">${esc(shortDetails(call))}</span>` : ''}
         <span class="call__meta">
-          <span>${formatWhen(call.call_started_at)}</span>
-          <span>${formatDuration(call.duration_seconds ?? 0)} call</span>
-          ${pro && lead ? statusPill(call) : ''}
-          ${pro && lead && statusOf(call) === 'new' ? dueBadge(call, client) : ''}
+          <span>${timeAgo(call.call_started_at)}</span>
+          ${pro && lead ? (statusOf(call) === 'new' ? dueBadge(call, client) : statusPill(call)) : ''}
           ${call.won_value && statusOf(call) === 'won' ? `<span class="won-amount">${money(call.won_value)}</span>` : ''}
-          ${call.assigned_to ? `<span>👷 ${esc(call.assigned_to)}</span>` : ''}
-          ${timesCalled > 1 ? `<span class="pill pill--repeat">Repeat caller · ${timesCalled} calls</span>` : ''}
+          ${timesCalled > 1 ? `<span class="pill pill--repeat">Rang ${timesCalled} times</span>` : ''}
         </span>
       </summary>
       <div class="call__body">
-        ${call.summary ? `<p class="summary-box"><strong>Summary</strong>${esc(call.summary)}</p>` : ''}
-        ${
-          call.recording_url
-            ? `<div class="recording-wrap">
-                <audio class="recording" controls preload="none" src="${esc(call.recording_url)}" data-recording></audio>
-                <a class="link-button recording-link" href="${esc(call.recording_url)}" target="_blank" rel="noopener">Play recording in a new tab</a>
-              </div>`
-            : ''
-        }
         ${actions.length ? `<div class="call__actions">${actions.join('')}</div>` : ''}
         ${pro && lead ? statusButtons(call) : ''}
         ${wonBox}
-        ${assign}
         <dl>
-          <div><dt>Call back on</dt><dd>${phone ? `<a href="${telHref(phone)}">${esc(phone)}</a>` : 'Not given'}</dd></div>
+          <div><dt>Phone</dt><dd>${phone ? `<a href="${telHref(phone)}">${esc(phone)}</a>` : 'Not given'}</dd></div>
           <div><dt>Address</dt><dd>${call.address ? `<a href="${mapsHref(call.address)}" target="_blank" rel="noopener">${esc(call.address)}</a>` : 'Not given'}</dd></div>
-          <div><dt>What they said</dt><dd>${esc(call.details) || 'No extra details'}</dd></div>
+          <div><dt>What they said</dt><dd>${esc(call.summary || call.details || call.issue) || 'Nothing written down'}</dd></div>
         </dl>
-        ${
-          pro
-            ? `<label class="field-inline field-inline--block">Notes
-                <textarea data-action="save-notes" data-id="${call.id}" rows="2" placeholder="e.g. Quote sent, call back Friday">${esc(call.notes ?? '')}</textarea>
-              </label>`
-            : ''
-        }
-        <button class="link-button link-button--danger" type="button" data-action="delete-call" data-id="${call.id}">Delete this call</button>
-        ${
-          pro
-            ? `<div class="transcript" data-transcript="${call.id}">
-                <button class="link-button" type="button" data-action="load-transcript" data-id="${call.id}">Show full conversation</button>
-              </div>`
-            : ''
-        }
+        <details class="more">
+          <summary>More</summary>
+          <div class="more__body">
+            <p class="muted">${formatWhen(call.call_started_at)} · ${formatDuration(call.duration_seconds ?? 0)} call</p>
+            ${call.details && call.summary ? `<p><strong>Details:</strong> ${esc(call.details)}</p>` : ''}
+            ${
+              call.recording_url
+                ? `<div class="recording-wrap">
+                    <audio class="recording" controls preload="none" src="${esc(call.recording_url)}" data-recording></audio>
+                    <a class="link-button recording-link" href="${esc(call.recording_url)}" target="_blank" rel="noopener">Play recording in a new tab</a>
+                  </div>`
+                : ''
+            }
+            ${assign}
+            ${
+              pro
+                ? `<label class="field-inline field-inline--block">Notes
+                    <textarea data-action="save-notes" data-id="${call.id}" rows="2" placeholder="e.g. Quote sent, call back Friday">${esc(call.notes ?? '')}</textarea>
+                  </label>
+                  <div class="transcript" data-transcript="${call.id}">
+                    <button class="link-button" type="button" data-action="load-transcript" data-id="${call.id}">Show full conversation</button>
+                  </div>`
+                : ''
+            }
+            <button class="link-button link-button--danger" type="button" data-action="delete-call" data-id="${call.id}">Delete this call</button>
+          </div>
+        </details>
       </div>
     </details>
   </li>`;
@@ -152,17 +152,17 @@ export function render({ state }) {
 
   const emptyText = {
     new: ['Nobody to call back ✅', 'Every lead has been called. Nice work.'],
-    won: ['No won jobs yet', 'Open a lead and tap <strong>Won</strong> when you get the job.'],
+    won: ['No jobs yet', 'Open a lead and tap <strong>Got the job</strong> when you win it.'],
   }[filter.id] ?? ['Nothing here', 'Leads will show up here as Elliot answers calls.'];
 
   return `
     <section class="page-head">
       <h1 class="page-title">Leads</h1>
-      <p class="hello__sub">Everyone Elliot spoke to. Tap one to call, text or update it.</p>
+      <p class="hello__sub">Tap a person to call them.</p>
     </section>
     <div class="chips" role="group" aria-label="Show">${chips}</div>
     <label class="search"><span class="visually-hidden">Search leads</span>
-      <input id="lead-search" type="search" data-action="search-leads" placeholder="Search name, phone, suburb or job" value="${esc(state.leadSearch)}" />
+      <input id="lead-search" type="search" data-action="search-leads" placeholder="Search name, phone or job" value="${esc(state.leadSearch)}" />
     </label>
     <ul class="call-list">
       ${shown.length ? shown.map((c) => leadCard(c, state, repeats)).join('') : `<li class="card empty"><strong>${emptyText[0]}</strong>${emptyText[1]}</li>`}

@@ -81,8 +81,7 @@ function funnel(f) {
   const steps = [
     { label: 'Leads', count: f.leads },
     { label: 'Called back', count: f.called_back },
-    { label: 'Quoted', count: f.quoted },
-    { label: 'Won', count: f.won },
+    { label: 'Got the job', count: f.won },
   ];
   if (!f.leads) return '<p class="muted">No leads in this period yet.</p>';
   return barList(steps, { total: f.leads });
@@ -117,7 +116,7 @@ export function render({ state, since, now }) {
       <div class="card stat">
         <span class="stat__label">Money won</span>
         <span class="stat__value">${s.won.count ? money(s.won.value) : '–'}</span>
-        <span class="stat__hint">${s.won.count ? `${s.won.count} job${s.won.count === 1 ? '' : 's'} marked Won` : 'Mark jobs Won in Leads'}</span>
+        <span class="stat__hint">${s.won.count ? `${s.won.count} job${s.won.count === 1 ? '' : 's'} you got` : 'Tap Got the job in Leads'}</span>
       </div>
       <div class="card stat">
         <span class="stat__label">Still in play</span>
@@ -180,7 +179,7 @@ export function render({ state, since, now }) {
       </section>
     </div>
 
-    <p class="footer-note">"Money won" counts jobs marked Won. "Still in play" is an estimate based on your average job value${
+    <p class="footer-note">"Money won" counts jobs marked Got the job. "Still in play" is an estimate based on your average job value${
       s.avgJobValue ? ` (${money(s.avgJobValue)})` : ''
     } and a ${formatPercent(s.conversionRate)} typical conversion rate — not a guarantee. "Paid for itself" compares money won with what Elliot costs over the same period (a part-month counts as a full month).</p>`;
 }

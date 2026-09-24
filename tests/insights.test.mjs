@@ -34,8 +34,8 @@ test('summariseRange: real money won, open estimate and times back', () => {
   assert.equal(s.open.estimate, 2 * 2000 * 0.3);
   assert.equal(s.fee, 750);
   assert.equal(s.timesBack, 4);
-  // called_back/quoted are cumulative: a won job was also called back and quoted.
-  assert.deepEqual(s.funnel, { leads: 5, called_back: 3, quoted: 3, won: 2, lost: 1 });
+  // called_back is cumulative: a won job was also called back. Old "quoted" counts as called.
+  assert.deepEqual(s.funnel, { leads: 5, called_back: 3, won: 2, lost: 1 });
 });
 
 test('feeForRange never under-charges: part months count as full months', () => {
@@ -72,7 +72,8 @@ test('suburbOf pulls the suburb out of Australian addresses', () => {
 
 test('jobTypeOf prefers the tagged job type and tidies text', () => {
   assert.equal(jobTypeOf({ job_type: 'ROOF LEAK', issue: 'water everywhere' }), 'Roof leak');
-  assert.equal(jobTypeOf({ issue: '  cracked   tiles ' }), 'Cracked tiles');
+  assert.equal(jobTypeOf({ issue: '  cracked   tiles on the roof ' }), 'Roof tile repair');
+  assert.equal(jobTypeOf({ issue: 'Skirting boards' }), 'Skirting boards');
   assert.equal(topCounts(['A', 'B', 'A', null]).map((x) => `${x.label}${x.count}`).join(), 'A2,B1');
 });
 

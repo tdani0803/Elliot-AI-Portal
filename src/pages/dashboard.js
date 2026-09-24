@@ -296,7 +296,7 @@ const actions = {
   },
   'mark-called'(el) {
     // From Home: the item drops off the to-do list, which is the point.
-    updateCall(el.dataset.id, { lead_status: 'called_back' }, 'Marked as called back');
+    updateCall(el.dataset.id, { lead_status: 'called_back' }, 'Marked as called');
   },
   'set-status'(el) {
     const { id, status } = el.dataset;
@@ -304,7 +304,7 @@ const actions = {
     if (!call || call.lead_status === status) return;
     state.open.add(id);
     state.sticky.add(id);
-    const message = { won: 'Nice one! 🎉 Add what the job was worth.', lost: 'Marked as lost' }[status] ?? 'Saved';
+    const message = { won: 'Nice one! 🎉 How much was the job worth?', lost: 'Marked as no job' }[status] ?? 'Saved';
     updateCall(id, { lead_status: status }, message);
     if (status === 'won') setTimeout(() => $(`won-${id}`)?.focus(), 50);
   },
