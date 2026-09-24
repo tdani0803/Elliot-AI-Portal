@@ -1,12 +1,14 @@
 // Leads: every call as a lead card with a simple status pipeline.
 import { formatDuration, formatWhen } from '../../lib/format.js';
 import { jobLabel, shortDetails } from '../../lib/jobs.js';
-import { STATUSES, callsPerPhone, isLead, normalisePhone, statusOf, suburbOf } from '../../lib/insights.js';
+import { STATUSES, bookingFinder, callsPerPhone, isLead, normalisePhone, statusOf, suburbOf } from '../../lib/insights.js';
 import { dueAt } from '../../lib/promise.js';
 import { ICONS, esc, pickBar, firstName, mapsHref, money, shortTime, smsHref, statusPill, telHref, timeAgo, urgencyPill } from './bits.js';
 
-export const FILTERS = [
-  { id: 'new', label: 'To call', test: (c) => isLead(c) && statusOf(c) === 'new' },
+// The chips along the top. Booked callers get their own chip, since they don't need a call back.
+const filtersFor = (bookingOf) => [
+  { id: 'new', label: 'To call', test: (c) => isLead(c) && statusOf(c) === 'new' && !bookingOf(c) },
+  { id: 'booked', label: 'Booked', test: (c) => isLead(c) && Boolean(bookingOf(c)) },
   { id: 'called_back', label: 'Called', test: (c) => isLead(c) && statusOf(c) === 'called_back' },
   { id: 'won', label: 'Got the job', test: (c) => isLead(c) && statusOf(c) === 'won' },
   { id: 'lost', label: 'No job', test: (c) => isLead(c) && statusOf(c) === 'lost' },
@@ -38,7 +40,12 @@ function dueBadge(call, client) {
 }
 
 // Name, job, one line of detail and status: the top of every call card.
-function cardHead(call, lead, pro, client, timesCalled) {
+const bookedText = (b) => {
+  const d = new Date(b.starts_at);
+  return `Booked ${d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' })}, ${shortTime(d)}`;
+};
+
+function cardHead(call, lead, pro, client, timesCalled, booking = null) {
   return `
         <span class="call__top">
           <span class="call__name">${esc(call.caller_name) || 'Unknown caller'}</span>
@@ -48,25 +55,26 @@ function cardHead(call, lead, pro, client, timesCalled) {
         ${shortDetails(call) ? `<span class="call__short">${esc(shortDetails(call))}</span>` : ''}
         <span class="call__meta">
           <span>${timeAgo(call.call_started_at)}</span>
-          ${pro && lead ? (statusOf(call) === 'new' ? dueBadge(call, client) : statusPill(call)) : ''}
+          ${booking ? `<span class="tag tag--green">${bookedText(booking)}</span>` : pro && lead ? (statusOf(call) === 'new' ? dueBadge(call, client) : statusPill(call)) : ''}
           ${call.won_value && statusOf(call) === 'won' ? `<span class="won-amount">${money(call.won_value)}</span>` : ''}
           ${timesCalled > 1 ? `<span class="pill pill--repeat">Rang ${timesCalled} times</span>` : ''}
         </span>`;
 }
 
 // Delete mode: the same card as a tick box.
-function pickCard(call, state, repeats) {
+function pickCard(call, state, repeats, bookingOf) {
   const lead = isLead(call);
   const timesCalled = repeats.get(normalisePhone(call.callback_number)) ?? 0;
   const picked = state.picked.has(call.id);
   return `<li><label class="call pick-card${picked ? ' is-picked' : ''}">
     <input type="checkbox" class="pick-card__box" data-action="pick" value="${call.id}" ${picked ? 'checked' : ''} />
-    <span class="pick-card__body">${cardHead(call, lead, state.pro, state.client, timesCalled)}</span>
+    <span class="pick-card__body">${cardHead(call, lead, state.pro, state.client, timesCalled, bookingOf(call))}</span>
   </label></li>`;
 }
 
-function leadCard(call, { members, client, pro }, repeats) {
+function leadCard(call, { members, client, pro }, repeats, bookingOf) {
   const lead = isLead(call);
+  const booking = bookingOf(call);
   const timesCalled = repeats.get(normalisePhone(call.callback_number)) ?? 0;
   const phone = call.callback_number;
   const reviewText = client.review_url
@@ -77,7 +85,7 @@ function leadCard(call, { members, client, pro }, repeats) {
   const actions = [
     phone && `<a class="btn btn--small" href="${telHref(phone)}">${ICONS.phone}Call</a>`,
     phone && `<a class="btn btn--small btn--ghost" href="${smsHref(phone, followUpText)}">${ICONS.text}Text</a>`,
-    pro && lead && `<button class="btn btn--small btn--ghost" type="button" data-action="book-from-lead" data-id="${call.id}">${ICONS.plus}Book job</button>`,
+    pro && lead && !booking && `<button class="btn btn--small btn--ghost" type="button" data-action="book-from-lead" data-id="${call.id}">${ICONS.plus}Book job</button>`,
     pro && lead && statusOf(call) === 'won' && phone && reviewText &&
       `<a class="btn btn--small btn--ghost" href="${smsHref(phone, reviewText)}">${ICONS.star}Ask for review</a>`,
   ].filter(Boolean);
@@ -107,13 +115,14 @@ function leadCard(call, { members, client, pro }, repeats) {
   return `<li>
     <details class="call" data-id="${call.id}">
       <summary>
-${cardHead(call, lead, pro, client, timesCalled)}
+${cardHead(call, lead, pro, client, timesCalled, booking)}
       </summary>
       <div class="call__body">
         ${actions.length ? `<div class="call__actions">${actions.join('')}</div>` : ''}
         ${pro && lead ? statusButtons(call) : ''}
         ${wonBox}
         <dl>
+          ${booking ? `<div><dt>Booked in</dt><dd><a href="#jobs">${bookedText(booking).replace('Booked ', '')}</a> · ${esc(booking.job)}</dd></div>` : ''}
           <div><dt>Phone</dt><dd>${phone ? `<a href="${telHref(phone)}">${esc(phone)}</a>` : 'Not given'}</dd></div>
           <div><dt>Address</dt><dd>${call.address ? `<a href="${mapsHref(call.address)}" target="_blank" rel="noopener">${esc(call.address)}</a>` : 'Not given'}</dd></div>
           <div><dt>What they said</dt><dd>${esc(call.summary || call.details || call.issue) || 'Nothing written down'}</dd></div>
@@ -151,9 +160,13 @@ ${cardHead(call, lead, pro, client, timesCalled)}
 }
 
 export function render({ state }) {
+  const bookingOf = bookingFinder(state.bookings);
+  const FILTERS = filtersFor(bookingOf);
   const counts = Object.fromEntries(FILTERS.map((f) => [f.id, state.calls.filter(f.test).length]));
-  // Before the database upgrade there are no statuses, so only offer All / Not a job.
-  const available = state.pro ? FILTERS : FILTERS.filter((f) => ['all', 'spam'].includes(f.id));
+  // Before the database upgrade there are no statuses, so only offer All / Spam. Empty extra chips stay hidden.
+  const available = (state.pro ? FILTERS : FILTERS.filter((f) => ['all', 'spam'].includes(f.id))).filter(
+    (f) => counts[f.id] || ['new', 'all'].includes(f.id) || f.id === state.leadFilter,
+  );
   const filter = available.find((f) => f.id === state.leadFilter) ?? available.find((f) => f.id === (state.pro ? 'new' : 'all'));
   // Cards you just changed stay put until you switch filters, so they don't vanish mid-edit.
   const visible = state.calls.filter((c) => filter.test(c) || state.sticky.has(c.id)).filter((c) => matches(c, state.leadSearch));
@@ -189,10 +202,10 @@ export function render({ state }) {
     <ul class="call-list">
       ${
         shown.length
-          ? shown.map((c) => (picking ? pickCard(c, state, repeats) : leadCard(c, state, repeats))).join('')
+          ? shown.map((c) => (picking ? pickCard(c, state, repeats, bookingOf) : leadCard(c, state, repeats, bookingOf))).join('')
           : `<li class="card empty"><strong>${emptyText[0]}</strong>${emptyText[1]}</li>`
       }
     </ul>
     ${visible.length > shown.length ? `<button class="btn btn--ghost btn--block" type="button" data-action="more-leads">Show more (${visible.length - shown.length} left)</button>` : ''}
-    <a class="link-more center" href="#customers">Customer list (everyone who's called, grouped by person) →</a>`;
+    ${!picking && shown.length ? '<p class="swipe-hint">Tip: swipe a call right once you’ve called them, or left to delete it.</p>' : ''}`;
 }

@@ -1,28 +1,67 @@
 // Home: the dashboard. Key numbers, then calls, then booked jobs. Everything else is one tap away.
 import { URGENCY_LABELS, formatNumber } from '../../lib/format.js';
-import { callbackList, isLead, statusOf, suburbOf, summariseRange } from '../../lib/insights.js';
+import { bookingFinder, callbackList, isLead, statusOf, suburbOf, summariseRange } from '../../lib/insights.js';
 import { jobLabel } from '../../lib/jobs.js';
 import { ICONS, esc, money, rangeToggle, shortTime, telHref, timeAgo } from './bits.js';
 
-// Getting notifications set up: one slim strip until this phone is receiving them.
-function alertsCard(status) {
-  if (!status || status === 'on') return '';
-  const bodies = {
-    'install-ios': `<span><strong>Get a buzz for new calls.</strong> On iPhone, first add ElliotAI to your home screen.</span>
-      <details class="strip__help"><summary>How</summary>
-        <ol class="steps">
-          <li>In <strong>Safari</strong>, tap <strong>Share</strong> (the square with an arrow).</li>
-          <li>Tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
-          <li>Open <strong>ElliotAI</strong> from your home screen, log in, and tap <strong>Turn on</strong> here.</li>
-        </ol>
-      </details>`,
-    off: `<span><strong>Get a buzz for new calls.</strong></span>
-      <button class="btn btn--small" type="button" data-action="enable-push">Turn on</button>
-      <button class="btn btn--small btn--ghost" type="button" data-action="install-app" data-install hidden>Add to home screen</button>`,
-    denied: `<span><strong>Notifications are blocked.</strong> Turn them on in your phone's Settings → Notifications → ElliotAI, then refresh.</span>`,
-    unsupported: `<span>This browser can't show notifications. Use <strong>Chrome</strong> on Android or <strong>Safari</strong> on iPhone.</span>`,
-  };
-  return `<section class="strip" aria-label="Notifications">${bodies[status] ?? ''}</section>`;
+// First-login checklist: the 3 things that make Elliot useful. Disappears once they're done.
+const isInstalled = () =>
+  window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
+const isPhone = () => /iphone|ipad|android/i.test(navigator.userAgent);
+const setupHidden = () => {
+  try {
+    return localStorage.getItem('elliotai.setupHidden') === '1';
+  } catch {
+    return false;
+  }
+};
+
+function setupCard(state) {
+  if (!state.alerts || setupHidden()) return '';
+  const iphone = /iphone|ipad/i.test(navigator.userAgent);
+  const steps = [
+    isPhone() && {
+      done: isInstalled(),
+      title: 'Put ElliotAI on your home screen',
+      help: iphone
+        ? 'In <strong>Safari</strong>, tap <strong>Share</strong> (square with an arrow), then <strong>Add to Home Screen</strong>. Open it from there.'
+        : '<button class="btn btn--small" type="button" data-action="install-app" data-install hidden>Add to home screen</button> Or use your browser menu: <strong>Add to Home screen</strong>.',
+    },
+    {
+      done: state.notify === 'on',
+      title: 'Turn on notifications',
+      help:
+        state.notify === 'install-ios'
+          ? 'Do step 1 first. iPhones only allow notifications from home-screen apps.'
+          : state.notify === 'denied'
+            ? "They're blocked. Open your phone's <strong>Settings → Notifications → ElliotAI</strong>, turn them on, then come back."
+            : state.notify === 'unsupported'
+              ? 'This browser can’t do notifications. Use <strong>Safari</strong> on iPhone or <strong>Chrome</strong> on Android.'
+              : '<button class="btn btn--small" type="button" data-action="enable-push">Turn on</button>',
+    },
+    {
+      done: state.calls.length > 0,
+      title: 'Make a test call',
+      help: 'Ring your Elliot number and pretend to be a customer. The call shows up here within a minute.',
+    },
+  ].filter(Boolean);
+  const left = steps.filter((st) => !st.done).length;
+  if (!left) return '';
+  const next = steps.findIndex((st) => !st.done);
+  return `<section class="card setup-list" aria-labelledby="setup-title">
+    <div class="dash__head">
+      <h2 class="dash__title" id="setup-title">Get set up · ${steps.length - left} of ${steps.length} done</h2>
+      <button class="link-button" type="button" data-action="hide-setup">Hide</button>
+    </div>
+    <ol class="setup-steps">${steps
+      .map(
+        (st, i) => `<li class="${st.done ? 'is-done' : i === next ? 'is-next' : ''}">
+          <span class="setup-steps__tick" aria-hidden="true">${st.done ? '✓' : i + 1}</span>
+          <div><strong>${st.title}</strong>${!st.done && i === next ? `<p>${st.help}</p>` : ''}</div>
+        </li>`,
+      )
+      .join('')}</ol>
+  </section>`;
 }
 
 function kpi(label, value, sub, extra = '') {
@@ -64,8 +103,9 @@ function jobsSection(bookings, now) {
   </section>`;
 }
 
-function callState(c, due) {
+function callState(c, due, booking) {
   if (!isLead(c)) return '<span class="tag tag--muted">Spam</span>';
+  if (booking) return '<span class="tag tag--green">Booked</span>';
   const st = statusOf(c);
   if (st === 'new') return due?.overdue ? '<span class="tag tag--red">Overdue</span>' : '<span class="tag tag--amber">To call</span>';
   if (st === 'won') return '<span class="tag tag--green">Got the job</span>';
@@ -73,7 +113,7 @@ function callState(c, due) {
   return '<span class="tag">Called</span>';
 }
 
-function callsSection(calls, list, now) {
+function callsSection(calls, list, now, bookingOf) {
   // People still waiting on a call back first, then everyone else, newest first.
   const waiting = new Map(list.map((c) => [c.id, c]));
   const rest = calls.filter((c) => !waiting.has(c.id));
@@ -87,7 +127,7 @@ function callsSection(calls, list, now) {
         <span class="muted">${esc(jobLabel(c) ?? 'Hung up')} · ${timeAgo(c.call_started_at, now)}</span>
       </button>
       <span class="row__side">
-        ${callState(c, due)}
+        ${callState(c, due, bookingOf(c))}
         ${due && c.callback_number ? `<a class="icon-btn" href="${telHref(c.callback_number)}" aria-label="Call ${esc(c.caller_name) || 'them'}">${ICONS.phone}</a>` : ''}
       </span>
     </li>`;
@@ -100,7 +140,7 @@ function callsSection(calls, list, now) {
 
 export function render({ state, since, now }) {
   const s = summariseRange({ calls: state.calls, client: state.client, since, range: state.range, now });
-  const list = state.pro ? callbackList(state.calls, now, state.client) : [];
+  const list = state.pro ? callbackList(state.calls, now, state.client, state.bookings) : [];
   const today = now.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
 
   return `
@@ -111,11 +151,11 @@ export function render({ state, since, now }) {
       </div>
       ${rangeToggle(state.range)}
     </section>
-    ${state.alerts ? alertsCard(state.notify) : ''}
+    ${setupCard(state)}
     ${kpiGrid(s, list)}
     <div class="dash-grid">
-      ${callsSection(state.calls, list, now)}
+      ${callsSection(state.calls, list, now, bookingFinder(state.bookings))}
       ${state.pro ? jobsSection(state.bookings ?? [], now) : ''}
     </div>
-    ${state.alerts && state.notify === 'on' ? `<p class="footer-note">Notifications are on · <button class="link-button" type="button" data-action="test-push">Send a test</button></p>` : ''}`;
+`;
 }

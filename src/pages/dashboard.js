@@ -3,7 +3,7 @@ import '../styles/app.css';
 import { DEMO_MODE, PAGES } from '../lib/supabase.js';
 import { createDataSource } from '../lib/data.js';
 import { RANGES, rangeStart } from '../lib/metrics.js';
-import { callbackList, customersFrom } from '../lib/insights.js';
+import { callbackList, isLead, statusOf } from '../lib/insights.js';
 import { escapeHtml } from '../lib/format.js';
 import {
   canPromptInstall,
@@ -16,10 +16,10 @@ import {
 import * as home from './tabs/home.js';
 import * as leads from './tabs/leads.js';
 import * as jobs from './tabs/jobs.js';
-import * as customers from './tabs/customers.js';
+import * as settings from './tabs/settings.js';
 import * as report from './tabs/report.js';
 
-const TABS = { home, leads, jobs, customers, report };
+const TABS = { home, leads, jobs, report, settings };
 const $ = (id) => document.getElementById(id);
 
 const saved = (key, fallback, allowed) => {
@@ -50,13 +50,11 @@ const state = {
   range: saved('range', 'week', RANGES.map((r) => r.id)),
   leadFilter: 'new',
   leadSearch: '',
-  customerSearch: '',
-  customerFilter: 'all',
   leadLimit: 40,
   open: new Set(), // which cards are expanded, so re-renders don't collapse them
   sticky: new Set(), // leads changed on this screen: keep showing them under the current filter
   transcripts: new Map(),
-  picking: null, // 'calls' | 'customers' while choosing things to delete
+  picking: null, // 'calls' while choosing calls to delete
   picked: new Set(),
 };
 
@@ -67,7 +65,8 @@ const data = await createDataSource();
 // ---------------------------------------------------------------------------
 // "#leads/<call id>" opens the Leads tab on that lead (used by notification taps).
 const route = () => {
-  const [tab, id] = location.hash.slice(1).split('/');
+  let [tab, id] = location.hash.slice(1).split('/');
+  if (tab === 'customers') tab = 'leads'; // old links: customers now live in Calls search
   return { tab: TABS[tab] ? tab : 'home', id: id ? decodeURIComponent(id) : null };
 };
 const currentTab = () => route().tab;
@@ -91,12 +90,12 @@ function openDeepLink() {
 function render() {
   const tab = currentTab();
   const now = new Date();
-  const navTab = tab === 'customers' ? 'leads' : tab; // Customers lives under Calls
+  const navTab = tab;
   document.querySelectorAll('[data-tab]').forEach((a) => {
     if (a.dataset.tab === navTab) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   });
-  const waiting = state.pro ? callbackList(state.calls, now, state.client).length : 0;
+  const waiting = state.pro ? callbackList(state.calls, now, state.client, state.bookings).length : 0;
   $('leads-badge').textContent = waiting > 99 ? '99+' : String(waiting);
   $('leads-badge').hidden = waiting === 0;
 
@@ -110,7 +109,7 @@ function render() {
     const text = state.transcripts.get(el.dataset.transcript);
     if (text !== undefined) el.innerHTML = transcriptHtml(text);
   });
-  if (focused && (focused === 'lead-search' || focused === 'customer-search')) {
+  if (focused === 'lead-search') {
     const input = $(focused);
     input?.focus();
     input?.setSelectionRange(input.value.length, input.value.length);
@@ -123,14 +122,34 @@ const transcriptHtml = (text) =>
   text ? `<pre class="transcript__text">${escapeHtml(text)}</pre>` : '<p class="muted">No recording of the conversation for this call.</p>';
 
 let toastTimer;
-function toast(message, isError = false) {
+let toastAction = null;
+function toast(message, isError = false, action = null, ms = isError ? 6000 : 2500) {
   const el = $('toast');
-  el.textContent = message;
+  el.textContent = '';
+  el.append(message);
+  toastAction = action;
+  if (action) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'toast__action';
+    button.textContent = action.label;
+    el.append(button);
+  }
   el.classList.toggle('toast--error', isError);
   el.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (el.hidden = true), isError ? 6000 : 2500);
+  toastTimer = setTimeout(() => {
+    el.hidden = true;
+    toastAction = null;
+  }, ms);
 }
+$('toast').addEventListener('click', (event) => {
+  if (!event.target.closest('.toast__action') || !toastAction) return;
+  const { run } = toastAction;
+  toastAction = null;
+  $('toast').hidden = true;
+  run();
+});
 
 // ---------------------------------------------------------------------------
 // Saving changes (optimistic: update the screen first, undo if saving fails)
@@ -153,24 +172,67 @@ async function updateCall(id, patch, message) {
   }
 }
 
-async function removeCalls(ids, message) {
+// Deleting is instant with an Undo button (no "are you sure?" pop-ups). The real delete
+// happens a few seconds later, or straight away if the app is closed or another delete starts.
+const UNDO_MS = 6000;
+let pendingDelete = null;
+
+async function commitDelete(pending) {
+  clearTimeout(pending.timer);
+  if (pendingDelete === pending) pendingDelete = null;
   try {
-    const deleted = await data.deleteCalls(ids);
-    if (!deleted) {
-      toast('Deleting needs a quick database update first. Ask ElliotAI to switch it on.', true);
-      return;
-    }
-    state.calls = state.calls.filter((c) => !ids.includes(c.id));
-    render();
-    toast(message);
+    const deleted = await data.deleteCalls(pending.ids);
+    if (!deleted) throw new Error('permission');
   } catch (err) {
     console.error(err);
+    restoreCalls(pending.removed);
     toast(
       /permission|policy|denied/i.test(err.message ?? '')
         ? 'Deleting needs a quick database update first. Ask ElliotAI to switch it on.'
         : "Couldn't delete that. Check your internet and try again.",
       true,
     );
+  }
+}
+
+function restoreCalls(removed) {
+  const have = new Set(state.calls.map((c) => c.id));
+  state.calls = [...state.calls, ...removed.filter((c) => !have.has(c.id))].sort((a, b) => b.call_started_at.localeCompare(a.call_started_at));
+  render();
+}
+
+function removeCalls(ids, message) {
+  if (pendingDelete) commitDelete(pendingDelete);
+  const removed = state.calls.filter((c) => ids.includes(c.id));
+  if (!removed.length) return;
+  state.calls = state.calls.filter((c) => !ids.includes(c.id));
+  render();
+  const pending = { ids, removed };
+  pending.timer = setTimeout(() => commitDelete(pending), UNDO_MS);
+  pendingDelete = pending;
+  toast(message, false, { label: 'Undo', run: () => {
+    clearTimeout(pending.timer);
+    if (pendingDelete === pending) pendingDelete = null;
+    restoreCalls(pending.removed);
+    toast('Brought back');
+  } }, UNDO_MS);
+}
+// Closing or leaving the app: finish any delete that's waiting on its Undo.
+addEventListener('pagehide', () => pendingDelete && commitDelete(pendingDelete));
+
+// The tradie's own on/off switches. Saved straight away; undone on screen if saving fails.
+async function saveSetting(key, value) {
+  const before = state.client[key];
+  state.client[key] = value;
+  render();
+  try {
+    await data.saveSettings(state.client.id, { [key]: value });
+    toast(value ? 'Turned on' : 'Turned off');
+  } catch (err) {
+    console.error(err);
+    state.client[key] = before;
+    render();
+    toast("Couldn't save that. Check your internet and try again.", true);
   }
 }
 
@@ -361,16 +423,8 @@ const actions = {
   print() {
     window.print();
   },
-  async 'delete-call'(el) {
-    if (!confirm('Delete this call for good? This can’t be undone.')) return;
-    await removeCalls([el.dataset.id], 'Call deleted');
-  },
-  async 'delete-customer'(el) {
-    const customer = customersFrom(state.calls).find((c) => c.key === el.dataset.key);
-    if (!customer) return;
-    const count = customer.calls.length;
-    if (!confirm(`Delete ${customer.name || 'this customer'} and ${count === 1 ? 'their call' : `all ${count} of their calls`}? This can’t be undone.`)) return;
-    await removeCalls(customer.calls.map((c) => c.id), 'Customer deleted');
+  'delete-call'(el) {
+    removeCalls([el.dataset.id], 'Call deleted');
   },
   'start-pick'(el) {
     state.picking = el.dataset.kind;
@@ -388,21 +442,24 @@ const actions = {
     boxes.forEach((b) => (allTicked ? state.picked.delete(b.value) : state.picked.add(b.value)));
     render();
   },
-  async 'delete-picked'() {
-    const n = state.picked.size;
-    if (!n) return;
-    const customers = state.picking === 'customers';
-    const ids = customers
-      ? customersFrom(state.calls).filter((c) => state.picked.has(c.key)).flatMap((c) => c.calls.map((call) => call.id))
-      : [...state.picked];
-    const what = customers ? `${n} customer${n === 1 ? '' : 's'} and all their calls` : `${n} call${n === 1 ? '' : 's'}`;
-    if (!confirm(`Delete ${what} for good? This can’t be undone.`)) return;
+  'delete-picked'() {
+    const ids = [...state.picked];
+    if (!ids.length) return;
     state.picking = null;
     state.picked.clear();
-    await removeCalls(ids, `Deleted ${what}`);
+    removeCalls(ids, `Deleted ${ids.length} call${ids.length === 1 ? '' : 's'}`);
   },
-  'customer-filter'(el) {
-    state.customerFilter = el.dataset.filter;
+  async logout() {
+    if (pendingDelete) await commitDelete(pendingDelete);
+    await data.signOut();
+    location.replace(PAGES.login);
+  },
+  'hide-setup'() {
+    try {
+      localStorage.setItem('elliotai.setupHidden', '1');
+    } catch {
+      /* private mode */
+    }
     render();
   },
   'open-lead'(el) {
@@ -474,6 +531,10 @@ $('view').addEventListener('submit', (event) => {
 
 $('view').addEventListener('change', (event) => {
   const el = event.target;
+  if (el.dataset.action === 'toggle-setting') {
+    saveSetting(el.dataset.key, el.checked);
+    return;
+  }
   if (el.dataset.action === 'pick') {
     if (el.checked) state.picked.add(el.value);
     else state.picked.delete(el.value);
@@ -495,10 +556,6 @@ $('view').addEventListener('input', (event) => {
     state.leadLimit = 40;
     render();
   }
-  if (el.dataset.action === 'search-customers') {
-    state.customerSearch = el.value;
-    render();
-  }
 });
 
 // Remember which cards are open so saving a change doesn't snap them shut.
@@ -511,6 +568,90 @@ $('view').addEventListener(
       state.open.add(id);
       if (currentTab() === 'leads') markOpened(id);
     } else state.open.delete(id);
+  },
+  true,
+);
+
+// Swipe a call card on a phone: right = "Called", left = delete. Both can be undone.
+const SWIPE_AT = 90;
+let swipe = null;
+let ignoreClicksUntil = 0;
+
+function resetSwipe(card, li) {
+  card.style.transform = '';
+  li.classList.remove('is-dragging');
+  setTimeout(() => {
+    delete li.dataset.swipe;
+    delete li.dataset.swipeLabel;
+  }, 180);
+}
+
+$('view').addEventListener(
+  'touchstart',
+  (event) => {
+    if (currentTab() !== 'leads' || state.picking || event.touches.length !== 1) return;
+    const card = event.target.closest('.call-list > li > details.call');
+    if (!card || card.open) return;
+    const t = event.touches[0];
+    swipe = { card, li: card.parentElement, x: t.clientX, y: t.clientY, dx: 0, active: false };
+  },
+  { passive: true },
+);
+
+$('view').addEventListener(
+  'touchmove',
+  (event) => {
+    if (!swipe) return;
+    const t = event.touches[0];
+    const dx = t.clientX - swipe.x;
+    const dy = t.clientY - swipe.y;
+    if (!swipe.active) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+        swipe = null; // they're scrolling, not swiping
+        return;
+      }
+      if (Math.abs(dx) < 12) return;
+      swipe.active = true;
+      swipe.li.classList.add('is-dragging');
+    }
+    swipe.dx = dx;
+    swipe.card.style.transform = `translateX(${dx}px)`;
+    swipe.li.dataset.swipe = dx > 0 ? 'right' : 'left';
+    swipe.li.dataset.swipeLabel = dx > 0 ? '✓ Called' : 'Delete';
+  },
+  { passive: true },
+);
+
+function endSwipe() {
+  if (!swipe) return;
+  const { card, li, dx, active } = swipe;
+  swipe = null;
+  if (!active) return;
+  ignoreClicksUntil = Date.now() + 400; // don't let the swipe also open the card
+  const call = state.calls.find((c) => c.id === card.dataset.id);
+  if (!call) return resetSwipe(card, li);
+  if (dx > SWIPE_AT && isLead(call)) {
+    resetSwipe(card, li);
+    const before = call.lead_status ?? 'new';
+    if (statusOf(call) === 'called_back') return;
+    updateCall(call.id, { lead_status: 'called_back' });
+    toast('Marked as called', false, { label: 'Undo', run: () => updateCall(call.id, { lead_status: before }, 'Moved back') }, 5000);
+  } else if (dx < -SWIPE_AT) {
+    card.style.transform = 'translateX(-110%)';
+    setTimeout(() => removeCalls([call.id], 'Call deleted'), 150);
+  } else {
+    resetSwipe(card, li);
+  }
+}
+$('view').addEventListener('touchend', endSwipe);
+$('view').addEventListener('touchcancel', endSwipe);
+$('view').addEventListener(
+  'click',
+  (event) => {
+    if (Date.now() < ignoreClicksUntil) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
   },
   true,
 );
@@ -534,6 +675,9 @@ async function loadAll() {
   state.members = members;
   state.pro = data.pro;
   state.alerts = data.alerts;
+  state.followUps = data.followUps;
+  // A delete still waiting on its Undo shouldn't pop back in on a refresh.
+  if (pendingDelete) state.calls = state.calls.filter((c) => !pendingDelete.ids.includes(c.id));
 }
 
 let reloadTimer;
@@ -594,9 +738,10 @@ async function start() {
   });
 }
 
-$('logout').addEventListener('click', async () => {
-  await data.signOut();
-  location.replace(PAGES.login);
+$('settings-link').addEventListener('click', () => {
+  location.hash = 'settings';
 });
+
+
 
 start();

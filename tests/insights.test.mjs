@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  bookingFinder,
   busiestTimes,
   callbackList,
   callsPerPhone,
@@ -130,4 +131,17 @@ test('monthlyTotals: 12 months oldest first, with won money in the month it was 
   assert.equal(rows[10].won, 1);
   assert.equal(rows[10].wonValue, 900);
   assert.equal(rows.reduce((n, r) => n + r.calls, 0), 2);
+});
+
+test('bookingFinder / callbackList: booked callers leave the call-back list', () => {
+  const calls = [call({ id: 'a', vapi_call_id: 'v1', urgency: 'urgent' }), call({ id: 'b', urgency: 'urgent' }), call({ id: 'c' })];
+  const bookings = [
+    { id: 'x', vapi_call_id: 'v1', status: 'booked', starts_at: '2026-09-30T00:00:00Z' },
+    { id: 'y', call_id: 'c', status: 'cancelled', starts_at: '2026-09-30T00:00:00Z' },
+  ];
+  const bookingOf = bookingFinder(bookings);
+  assert.equal(bookingOf(calls[0])?.id, 'x');
+  assert.equal(bookingOf(calls[2]), null); // cancelled doesn't count
+  const list = callbackList(calls, new Date('2026-09-22T01:00:00Z'), client, bookings).map((c) => c.id);
+  assert.deepEqual(list, ['b', 'c']);
 });

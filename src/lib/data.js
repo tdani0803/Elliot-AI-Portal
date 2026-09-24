@@ -2,11 +2,12 @@
 import { DEMO_MODE, supabase } from './supabase.js';
 
 const BASE_CALL_COLUMNS =
-  'id, call_started_at, duration_seconds, caller_name, callback_number, address, issue, details, urgency';
+  'id, vapi_call_id, call_started_at, duration_seconds, caller_name, callback_number, address, issue, details, urgency';
 const PRO_CALL_COLUMNS = `${BASE_CALL_COLUMNS}, job_type, summary, recording_url, lead_status, won_value, notes, assigned_to, status_updated_at`;
 const BASE_CLIENT_COLUMNS = 'id, business_name, avg_job_value, conversion_rate';
 const PRO_CLIENT_COLUMNS = `${BASE_CLIENT_COLUMNS}, monthly_fee, timezone, business_hours, review_url`;
 const ALERT_CLIENT_COLUMNS = `${PRO_CLIENT_COLUMNS}, callback_urgent_minutes, callback_standard_minutes, calendar_token`;
+const FOLLOW_UP_CLIENT_COLUMNS = `${ALERT_CLIENT_COLUMNS}, text_callers, remind_customers, weekly_summary`;
 const MAX_CALLS = 3000;
 
 // "column does not exist" / "relation does not exist" => the pro_features migration isn't run yet.
@@ -15,6 +16,7 @@ const isMissingSchema = (error) => /column|relation|schema cache|does not exist/
 function supabaseSource() {
   let pro = true;
   let alerts = true;
+  let followUps = true;
 
   async function select(table, proCols, baseCols, build) {
     if (pro) {
@@ -35,8 +37,17 @@ function supabaseSource() {
     get alerts() {
       return alerts && pro;
     },
+    get followUps() {
+      return followUps && alerts && pro;
+    },
     async client() {
       // Newest features first; fall back if the matching database update hasn't been run.
+      if (followUps) {
+        const { data, error } = await supabase.from('clients').select(FOLLOW_UP_CLIENT_COLUMNS).maybeSingle();
+        if (!error) return data;
+        if (!isMissingSchema(error)) throw error;
+        followUps = false;
+      }
       if (alerts) {
         const { data, error } = await supabase.from('clients').select(ALERT_CLIENT_COLUMNS).maybeSingle();
         if (!error) return data;
@@ -101,6 +112,11 @@ function supabaseSource() {
       const { error } = await supabase.from('bookings').delete().eq('id', id);
       if (error) throw error;
     },
+    // The tradie's own on/off switches (text callers, remind customers, weekly summary).
+    async saveSettings(clientId, patch) {
+      const { error } = await supabase.from('clients').update(patch).eq('id', clientId);
+      if (error) throw error;
+    },
     subscribe(onChange, onStatus) {
       // RLS applies to realtime too: only this business's rows arrive.
       const channel = supabase
@@ -127,6 +143,11 @@ async function demoSource() {
   return {
     pro: true,
     alerts: true,
+    followUps: true,
+    saveSettings: async (_id, patch) => {
+      await pause();
+      Object.assign(demoClient, patch);
+    },
     markAlertOpened: async () => {},
     client: async () => demoClient,
     members: async () => demoMembers,
@@ -134,7 +155,10 @@ async function demoSource() {
     transcript: async (id) => calls.find((c) => c.id === id)?.transcript ?? null,
     async deleteCalls(ids) {
       await pause();
-      for (const id of ids) calls.splice(calls.findIndex((c) => c.id === id), 1);
+      for (const id of ids) {
+        const at = calls.findIndex((c) => c.id === id);
+        if (at !== -1) calls.splice(at, 1);
+      }
       return ids.length;
     },
     async updateCall(id, patch) {

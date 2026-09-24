@@ -91,11 +91,26 @@ export function summariseRange({ calls, client, since, range, now = new Date() }
   };
 }
 
+// The upcoming (or today's) booked job for a call, if Elliot or the tradie booked one.
+// Matched by the call it was booked from, or by the Vapi call Elliot booked it on.
+export function bookingFinder(bookings = []) {
+  const byCall = new Map();
+  const byVapi = new Map();
+  for (const b of bookings) {
+    if (b.status !== 'booked') continue;
+    if (b.call_id && !byCall.has(b.call_id)) byCall.set(b.call_id, b);
+    if (b.vapi_call_id && !byVapi.has(b.vapi_call_id)) byVapi.set(b.vapi_call_id, b);
+  }
+  return (call) => byCall.get(call.id) ?? (call.vapi_call_id ? byVapi.get(call.vapi_call_id) : undefined) ?? null;
+}
+
 // Leads nobody has called back yet, most urgent first, then oldest first.
 // A lead is overdue once the call-back time Elliot promised the caller has passed.
-export function callbackList(calls, now = new Date(), client = {}) {
+// Callers already booked in don't need a call back, so they're left off.
+export function callbackList(calls, now = new Date(), client = {}, bookings = []) {
+  const bookingOf = bookingFinder(bookings);
   return calls
-    .filter((c) => isLead(c) && statusOf(c) === 'new')
+    .filter((c) => isLead(c) && statusOf(c) === 'new' && !bookingOf(c))
     .map((c) => {
       const ageHours = (now - new Date(c.call_started_at)) / 3600000;
       const due = dueAt(c, client);

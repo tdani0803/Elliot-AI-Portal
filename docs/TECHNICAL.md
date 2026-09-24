@@ -268,3 +268,12 @@ Vapi's built-in SMS tool has no server URL, so its message body can't be read re
 - `?secret=<secret>` on the Server URL, for Vapi screens without a secret field.
 
 **Supabase keys:** the new `sb_secret_…` keys are sent only in the `apikey` header. Legacy service_role JWTs are sent as `apikey` plus `Authorization: Bearer`.
+
+## Follow-ups (texts, reminders, weekly summary)
+
+- `netlify/lib/followups.mjs` builds and sends them; `netlify/functions/follow-ups.mjs` runs hourly for reminders
+  (4pm–8pm the day before, business time zone) and the Monday 7am+ summary. Each send is claimed first
+  (`calls.caller_texted_at`, `bookings.reminder_sent_at`, `clients.weekly_summary_sent_on`) so nothing goes twice.
+- The caller thank-you text is sent by the webhook after the end-of-call report; the "New job booked" push after `book_job`.
+- Only Australian mobiles (04… / +614…) are texted. Switches: `clients.text_callers`, `remind_customers`, `weekly_summary`
+  (tradies can update just these three columns themselves).

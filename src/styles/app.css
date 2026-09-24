@@ -472,7 +472,7 @@
 .facts { margin: 0; display: grid; gap: 10px; }
 .facts div { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--neutral-soft); padding-bottom: 8px; }
 .facts dt { color: var(--ink-2); font-weight: 600; }
-.facts dd { margin: 0; font-weight: 700; }
+.facts dd { margin: 0; font-weight: 700; text-align: right; }
 
 /* Booking form (bottom sheet on phones, centred on desktop) */
 .sheet {
@@ -716,3 +716,50 @@
 .pick-bar__actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .pick-bar__actions .btn--danger { margin-left: auto; }
 @media (min-width: 720px) { .pick-bar { bottom: 16px; } }
+
+/* Header settings button */
+.topbar__icon { width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid rgb(255 255 255 / 0.3); border-radius: var(--radius-sm); background: transparent; color: #fff; cursor: pointer; }
+.topbar__icon:hover { background: rgb(255 255 255 / 0.08); }
+.topbar__icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Toast with an Undo button */
+.toast { display: flex; align-items: center; gap: 14px; }
+.toast__action { border: 0; background: none; color: var(--accent-light); font: 700 0.95rem var(--font-body); padding: 4px 2px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Settings */
+.settings { list-style: none; margin: 0; padding: 0; display: grid; }
+.setting { border-top: 1px solid var(--line); }
+.setting:first-child { border-top: 0; }
+.setting__row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; cursor: pointer; }
+.setting__text { display: grid; gap: 2px; min-width: 0; }
+.setting__text .muted { font-size: 0.88rem; }
+.setting__side { flex: none; font-size: 0.88rem; max-width: 50%; text-align: right; }
+.switch { appearance: none; flex: none; width: 48px; height: 28px; margin: 0; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; transition: background 0.15s; }
+.switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: var(--shadow-sm); transition: transform 0.15s; }
+.switch:checked { background: var(--calm); }
+.switch:checked::after { transform: translateX(20px); }
+.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* First-login checklist */
+.setup-list { padding: 16px; display: grid; gap: 10px; border-left: 3px solid var(--accent); }
+.setup-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.setup-steps li { display: flex; gap: 12px; align-items: flex-start; }
+.setup-steps p { margin: 4px 0 0; color: var(--ink-2); font-size: 0.92rem; }
+.setup-steps__tick { width: 26px; height: 26px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--neutral-soft); color: var(--ink-3); font-weight: 700; font-size: 0.85rem; }
+.setup-steps .is-next .setup-steps__tick { background: var(--brand); color: #fff; }
+.setup-steps .is-done { color: var(--ink-3); }
+.setup-steps .is-done strong { font-weight: 500; text-decoration: line-through; }
+.setup-steps .is-done .setup-steps__tick { background: var(--calm); color: #fff; }
+
+/* Swipe on call cards (phones) */
+.swipe-hint { display: none; text-align: center; font-size: 0.85rem; color: var(--ink-3); margin: 0; }
+@media (hover: none) { .swipe-hint { display: block; } }
+.call-list > li { position: relative; border-radius: var(--radius-sm); }
+.call-list > li[data-swipe]::before {
+  content: attr(data-swipe-label); position: absolute; inset: 0; display: flex; align-items: center; padding: 0 22px;
+  border-radius: var(--radius-sm); font-weight: 700; color: #fff;
+}
+.call-list > li[data-swipe='right']::before { background: var(--calm); justify-content: flex-start; }
+.call-list > li[data-swipe='left']::before { background: var(--urgent); justify-content: flex-end; }
+.call-list > li > .call { position: relative; transition: transform 0.18s ease; touch-action: pan-y; }
+.call-list > li.is-dragging > .call { transition: none; }

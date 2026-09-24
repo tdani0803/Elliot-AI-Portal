@@ -81,7 +81,14 @@ export const demoClient = {
   callback_urgent_minutes: 60,
   callback_standard_minutes: 240,
   calendar_token: '00000000-0000-4000-8000-000000000000',
+  text_callers: true,
+  remind_customers: true,
+  weekly_summary: true,
 };
 export const demoMembers = [{ display_name: 'Jake' }, { display_name: 'Mia' }];
 export const demoCalls = buildCalls();
-export const demoBookings = buildBookings();
+// Elliot's bookings point back at the call they were made on.
+export const demoBookings = buildBookings().map((b) => ({
+  ...b,
+  call_id: b.source === 'elliot' ? (demoCalls.find((c) => c.caller_name === b.customer_name)?.id ?? null) : null,
+}));

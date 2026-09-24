@@ -9,7 +9,8 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { leadFieldsFromArgs, parseWebhook } from '../lib/parse-call.mjs';
 import { checkAvailability, dayWindow, planBooking, readStartTime, toolDate, toolName } from '../lib/tools.mjs';
-import { alertIfNewLead } from '../lib/alerts.mjs';
+import { alertIfNewLead, pushToClient } from '../lib/alerts.mjs';
+import { announceBooking, textCaller } from '../lib/followups.mjs';
 import { rest, restJson } from '../lib/rest.mjs';
 import { DEFAULT_TZ, formatDayInZone, formatTimeInZone } from '../../src/lib/time.js';
 
@@ -54,6 +55,15 @@ async function saveCall(clientId, vapiCallId, row) {
     if (!/column/i.test(err.message)) throw err;
     console.warn('vapi-webhook: newer columns missing, saving basic call details only');
     await save(Object.fromEntries(Object.entries(row).filter(([key]) => !PRO_COLUMNS.includes(key))));
+  }
+}
+
+// The caller's thank-you text. Like alerts, it must never break saving a call.
+async function textCallerSafely(vapiCallId) {
+  try {
+    console.log('vapi-webhook: caller text', JSON.stringify(await textCaller(vapiCallId)));
+  } catch (err) {
+    console.error('vapi-webhook: caller text failed', err?.message ?? err);
   }
 }
 
@@ -138,6 +148,7 @@ async function handleToolCalls({ assistantId, vapiCallId, customerNumber, calls 
         );
         if (plan.booking) {
           await rest('bookings', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(plan.booking) });
+          await announceBooking(plan.booking, client, pushToClient);
         }
         result = plan.reply;
       }
@@ -185,6 +196,7 @@ export default async (req) => {
     }
     await saveCall(client.id, parsed.vapiCallId, parsed.row);
     await alertSafely(parsed.vapiCallId);
+    await textCallerSafely(parsed.vapiCallId);
     return json(200, { ok: true });
   } catch (err) {
     console.error('vapi-webhook:', err);

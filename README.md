@@ -277,6 +277,17 @@ Same as Part 9 Step A, but with this file: `supabase/migrations/20260925000000_a
 
 So you can delete calls and customers in the portal. Same again (**+ New query**), with this file: `supabase/migrations/20260926000000_delete.sql`. Safe to run more than once.
 
+### Step A3: Turn on the automatic follow-ups
+
+Same again (**+ New query**) with `supabase/migrations/20260927000000_state_timezone.sql`, then again with `supabase/migrations/20260928000000_follow_ups.sql`. The second one adds:
+
+- a **thank-you text** to every caller after the call (or their booked time, if Elliot booked them in)
+- a **reminder text** to customers from 4pm the afternoon before a booked job
+- a **Monday-morning summary** notification for the tradie
+- a **"New job booked"** notification the moment Elliot books something
+
+Put the number customers should ring into the client's **business_phone** box. The texts go out through Twilio, so they need the Twilio settings from Step D. Tradies can switch each one on or off in the app (⚙️ top right).
+
 ### Step B: Fill in 3 boxes in the client's row
 
 Go to **Supabase → Table Editor → clients**:
