@@ -87,6 +87,7 @@ function openDeepLink() {
   requestAnimationFrame(() => document.querySelector(`details[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'start' }));
 }
 
+let lastTab = null;
 function render() {
   const tab = currentTab();
   const now = new Date();
@@ -102,6 +103,9 @@ function render() {
   const view = $('view');
   const focused = document.activeElement?.id;
   view.innerHTML = TABS[tab].render({ state, now, since: rangeStart(state.range, now) });
+  // Fade the page in when you arrive on a tab, not every time something on it changes.
+  view.classList.toggle('view-enter', tab !== lastTab);
+  lastTab = tab;
   view.querySelectorAll('details[data-id]').forEach((d) => {
     if (state.open.has(d.dataset.id)) d.open = true;
   });

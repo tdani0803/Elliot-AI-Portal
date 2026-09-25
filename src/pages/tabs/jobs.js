@@ -22,7 +22,7 @@ function jobCard(b) {
     b.source === 'elliot' ? '<span class="pill pill--elliot">Booked by Elliot</span>' : '',
     b.status === 'done' ? '<span class="pill pill--won">Done</span>' : '',
     b.status === 'cancelled' ? '<span class="pill pill--irrelevant">Cancelled</span>' : '',
-    b.assigned_to ? `<span class="muted">👷 ${esc(b.assigned_to)}</span>` : '',
+    b.assigned_to ? `<span class="muted who">${ICONS.person}${esc(b.assigned_to)}</span>` : '',
   ].join('');
   return `<li class="card job${b.status !== 'booked' ? ' job--closed' : ''}">
     <div class="job__time"><strong>${timeText(start)}</strong><span>to ${timeText(end)}</span></div>
@@ -75,7 +75,7 @@ export function render({ state, now }) {
     </section>
     ${
       state.client.calendar_token
-        ? `<button class="btn btn--ghost btn--block" type="button" data-action="calendar-help">Show these jobs in my phone's calendar</button>`
+        ? `<button class="link-button link-button--icon" type="button" data-action="calendar-help">${ICONS.calendar}Show jobs in my phone's calendar</button>`
         : ''
     }
     ${upcoming.length ? grouped(upcoming, now) : emptyCard('No jobs booked yet', 'Tap <strong>Book a job</strong>, or open a lead and tap <strong>Book job</strong>.')}

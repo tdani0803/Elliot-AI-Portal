@@ -177,9 +177,12 @@ function render() {
     </section>
 
     <p class="footer-note"><a href="${PAGES.dashboard}">Open the client portal</a> · <a href="https://github.com/tdani0803/elliot-ai-portal/blob/claude/elliotai-client-portal-r2tj7a/docs/NEW-CLIENT.md" target="_blank" rel="noopener">New-client guide</a></p>`;
+  $('view').classList.toggle('view-enter', !rendered);
+  rendered = true;
   $('view').setAttribute('aria-busy', 'false');
 }
 
+let rendered = false;
 async function load() {
   try {
     state.data = await api('overview');

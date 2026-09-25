@@ -35,7 +35,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 16px;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
   background: var(--navy);
   color: #fff;
   border-bottom: 1px solid var(--navy-2);
@@ -44,7 +44,7 @@
 .topbar .btn--ghost:hover { background: rgb(255 255 255 / 0.08); }
 
 .page {
-  max-width: 880px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 20px 16px 48px;
   display: grid;
@@ -253,6 +253,7 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   background: var(--paper);
+  box-shadow: 0 -2px 12px rgb(15 23 42 / 0.05);
   border-top: var(--border);
   padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
 }
@@ -269,7 +270,9 @@
   font-weight: 700;
 }
 .tabbar a svg { width: 24px; height: 24px; }
+.tabbar a { transition: color 0.15s, background 0.15s; }
 .tabbar a[aria-current='page'] { background: var(--brand-soft); color: var(--brand); }
+.tabbar a[aria-current='page']::after { content: ''; position: absolute; top: 0; left: 32%; right: 32%; height: 3px; border-radius: 0 0 3px 3px; background: var(--brand); }
 .tabbar__badge {
   position: absolute;
   top: 0; left: calc(50% + 6px);
@@ -288,25 +291,31 @@
 .page > * { min-width: 0; }
 
 @media (min-width: 720px) {
-  .tabbar {
-    position: sticky;
-    top: 61px;
-    bottom: auto;
+  /* On bigger screens the sections sit inside the navy header. */
+  .topbar .tabbar {
+    position: static;
     display: flex;
     justify-content: center;
-    gap: 6px;
-    border-top: 0;
-    border-bottom: var(--border);
-    padding: 6px 16px;
+    gap: 4px;
+    margin: 0 auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    backdrop-filter: none;
   }
-  .tabbar a { display: flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: 0.95rem; border-radius: var(--radius-pill); }
-  .tabbar a svg { width: 20px; height: 20px; }
-  .tabbar__badge { position: static; }
+  .topbar .tabbar a { display: flex; align-items: center; gap: 8px; padding: 8px 14px; font-size: 0.95rem; font-weight: 600; color: rgb(255 255 255 / 0.72); border-radius: var(--radius-sm); }
+  .topbar .tabbar a:hover { color: #fff; background: rgb(255 255 255 / 0.06); }
+  .topbar .tabbar a[aria-current='page'] { color: #fff; background: rgb(255 255 255 / 0.12); }
+  .topbar .tabbar a[aria-current='page']::after { display: none; }
+  .tabbar a svg { width: 18px; height: 18px; }
+  .tabbar__badge { position: static; border: 0; }
   .page { padding-bottom: 48px; }
 }
 
 .page-head { display: grid; gap: 2px; }
-.page-head--row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.page-head--row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.page-head--row > div { flex: 1 1 0; min-width: 0; }
+.page-head--row > .btn { flex: none; margin-top: 4px; }
 .page-title { font-size: clamp(1.8rem, 6vw, 2.3rem); }
 .section-title { font-size: 1.3rem; }
 .mini-title { font: 700 1rem var(--font-display); margin: 4px 0 0; }
@@ -804,3 +813,62 @@
 .hours__day { font-weight: 600; }
 .hours__closed { display: flex; align-items: center; gap: 4px; font-size: 0.85rem; white-space: nowrap; }
 .copy-box { width: 100%; min-height: 44px; padding: 0 12px; border: var(--border); border-radius: var(--radius-sm); font: 500 0.9rem var(--font-body); background: var(--bg); }
+
+
+/* =====================================================================
+   Polish: feel, motion, loading
+   ===================================================================== */
+html { -webkit-tap-highlight-color: transparent; }
+.btn, .chip, .status-btn, .range button, .icon-btn, .topbar__icon, .row__btn, .latest__item {
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease;
+}
+.btn:active, .chip:active, .status-btn:active, .icon-btn:active, .range button:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.55; transform: none; }
+.card, .call, .kpi { transition: box-shadow 0.2s ease, border-color 0.2s ease; }
+@media (hover: hover) {
+  .call:hover, .owner-client:hover { box-shadow: var(--shadow); }
+}
+.call summary:active { background: var(--bg); }
+.link-button--icon { display: inline-flex; align-items: center; gap: 6px; justify-self: start; text-decoration: none; color: var(--accent); }
+.link-button--icon svg, .who svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.who { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Each section fades up gently when you switch tabs. */
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheet-up { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
+@keyframes pop { from { opacity: 0; transform: translate(-50%, 12px) scale(0.98); } to { opacity: 1; transform: translate(-50%, 0); } }
+.view-enter > * { animation: rise 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.view-enter > *:nth-child(2) { animation-delay: 0.03s; }
+.view-enter > *:nth-child(3) { animation-delay: 0.06s; }
+.view-enter > *:nth-child(4) { animation-delay: 0.09s; }
+.view-enter > *:nth-child(5) { animation-delay: 0.12s; }
+.view-enter > *:nth-child(n + 6) { animation-delay: 0.15s; }
+.call[open] > .call__body { animation: fade 0.2s ease both; }
+.sheet[open] { animation: sheet-up 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.sheet[open]::backdrop { animation: fade 0.2s ease both; }
+.toast:not([hidden]) { animation: pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.kpi__value, .stat__value { animation: fade 0.4s ease both; }
+
+/* Loading: a grey outline of the page instead of a blank screen. */
+@keyframes shimmer { from { background-position: -400px 0; } to { background-position: 400px 0; } }
+.skeleton { display: grid; gap: 14px; }
+.skeleton span {
+  display: block; border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--neutral-soft) 0, #e2e7ee 40%, var(--neutral-soft) 80%) 0 0 / 800px 100%;
+  animation: shimmer 1.3s linear infinite;
+}
+.skeleton__line--title { height: 30px; width: 60%; }
+.skeleton__line--short { height: 16px; width: 35%; }
+.skeleton__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (min-width: 720px) { .skeleton__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.skeleton__grid span { height: 92px; }
+.skeleton__block { height: 160px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+}
+
+/* Login and signup: a line under the logo */
+.auth__tagline { margin: -12px 0 0; text-align: center; color: rgb(255 255 255 / 0.72); font-size: 0.95rem; }
+.auth__foot { text-align: center; color: rgb(255 255 255 / 0.5); font-size: 0.8rem; margin: 0; }

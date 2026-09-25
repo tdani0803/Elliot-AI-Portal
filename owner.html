@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="ElliotAI" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700&display=swap" />
@@ -41,7 +41,11 @@
   </header>
 
   <main class="page page--wide" id="view" aria-busy="true" aria-live="polite">
-    <p class="muted center">Loading…</p>
+    <div class="skeleton" aria-label="Loading">
+      <span class="skeleton__line skeleton__line--title"></span>
+      <div class="skeleton__grid"><span></span><span></span><span></span><span></span></div>
+      <span class="skeleton__block"></span>
+    </div>
   </main>
 
   <dialog class="sheet sheet--wide" id="client-dialog" aria-labelledby="client-title">

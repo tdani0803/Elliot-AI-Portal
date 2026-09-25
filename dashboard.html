@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="ElliotAI" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700&display=swap" />
@@ -38,18 +38,25 @@
   <div class="upgrade-banner" id="upgrade-banner" hidden>New features (calls, jobs, report) switch on once ElliotAI finishes a quick update.</div>
   <header class="topbar">
     <span class="wordmark" role="img" aria-label="ElliotAI"><span class="wordmark__text" aria-hidden="true">Elliot<span>AI</span></span></span>
+    <nav class="tabbar" id="tabbar" aria-label="Sections" hidden>
+      <a href="#home" data-tab="home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7v9h-6v-6H9v6H3z"/></svg><span>Home</span></a>
+      <a href="#leads" data-tab="leads"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg><span>Calls</span><b class="tabbar__badge" id="leads-badge" hidden></b></a>
+      <a href="#jobs" data-tab="jobs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5"/></svg><span>Jobs</span></a>
+      <a href="#report" data-tab="report"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Report</span></a>
+    </nav>
     <button class="topbar__icon" id="settings-link" type="button" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   </header>
 
-  <nav class="tabbar" id="tabbar" aria-label="Sections" hidden>
-    <a href="#home" data-tab="home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 4l9 7v9h-6v-6H9v6H3z"/></svg><span>Home</span></a>
-    <a href="#leads" data-tab="leads"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg><span>Calls</span><b class="tabbar__badge" id="leads-badge" hidden></b></a>
-    <a href="#jobs" data-tab="jobs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5"/></svg><span>Jobs</span></a>
-    <a href="#report" data-tab="report"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Report</span></a>
-  </nav>
+
 
   <main class="page" id="view" aria-busy="true" aria-live="polite">
-    <p class="muted center">Loading…</p>
+    <div class="skeleton" aria-label="Loading">
+      <span class="skeleton__line skeleton__line--title"></span>
+      <span class="skeleton__line skeleton__line--short"></span>
+      <div class="skeleton__grid"><span></span><span></span><span></span><span></span></div>
+      <span class="skeleton__block"></span>
+      <span class="skeleton__block"></span>
+    </div>
   </main>
 
   <dialog class="sheet" id="booking-dialog" aria-labelledby="booking-title">
