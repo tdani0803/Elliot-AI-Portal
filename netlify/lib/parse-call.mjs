@@ -124,6 +124,12 @@ function toIso(value) {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+// What Vapi charged for the call, in US dollars (their reports use USD).
+function toCost(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 10000) / 10000 : null;
+}
+
 function fromEndOfCallReport(msg) {
   const call = msg.call ?? {};
   const toolArgs = findSendTextArgs(msg.artifact?.messages ?? msg.messages);
@@ -169,6 +175,7 @@ function fromEndOfCallReport(msg) {
       ),
       transcript: clean(artifact.transcript ?? msg.transcript),
       summary,
+      cost_usd: toCost(msg.cost ?? call.cost),
     },
   };
 }

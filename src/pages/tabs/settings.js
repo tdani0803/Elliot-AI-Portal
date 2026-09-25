@@ -65,6 +65,18 @@ export function render({ state }) {
       </ul>
     </section>
 
+    ${
+      c.billing_status && c.billing_status !== 'none'
+        ? `<section class="card panel">
+            <h2 class="dash__title">Your ElliotAI plan</h2>
+            <ul class="settings"><li class="setting"><div class="setting__row">
+              <span class="setting__text"><strong>${c.billing_status === 'past_due' ? 'Payment failed' : c.billing_status === 'active' ? 'Paid monthly' : c.billing_status === 'invited' ? 'Waiting for payment' : 'Cancelled'}</strong><span class="muted">Change your card or see your invoices.</span></span>
+              <span class="setting__side"><button class="btn btn--small btn--ghost" type="button" data-action="billing-portal">Payment details</button></span>
+            </div></li></ul>
+          </section>`
+        : ''
+    }
+
     <section class="card panel">
       <h2 class="dash__title">What Elliot tells callers</h2>
       <dl class="facts">

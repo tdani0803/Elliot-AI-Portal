@@ -1,5 +1,7 @@
 # ElliotAI Client Portal — Setup Guide
 
+> **Your owner tools** (add clients, costs and profit, alerts, Stripe): one-time setup in **[docs/OWNER-SETUP.md](docs/OWNER-SETUP.md)**.
+>
 > **Adding a new client?** Follow **[docs/NEW-CLIENT.md](docs/NEW-CLIENT.md)**, which covers everything for one business in about 30 minutes. Their script comes from **[docs/prompt-template.md](docs/prompt-template.md)**.
 
 This guide gets your client portal live on the internet.

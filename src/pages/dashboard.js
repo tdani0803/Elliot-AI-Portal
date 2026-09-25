@@ -449,6 +449,15 @@ const actions = {
     state.picked.clear();
     removeCalls(ids, `Deleted ${ids.length} call${ids.length === 1 ? '' : 's'}`);
   },
+  async 'billing-portal'(el) {
+    el.disabled = true;
+    try {
+      location.assign(await data.billingPortal());
+    } catch (err) {
+      toast(err.message, true);
+      el.disabled = false;
+    }
+  },
   async logout() {
     if (pendingDelete) await commitDelete(pendingDelete);
     await data.signOut();

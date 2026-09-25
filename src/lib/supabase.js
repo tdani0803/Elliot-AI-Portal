@@ -30,4 +30,5 @@ export const PAGES = {
   forgot: '/forgot-password.html',
   reset: '/reset-password.html',
   signup: '/signup.html',
+  owner: '/owner.html',
 };

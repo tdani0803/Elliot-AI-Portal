@@ -11,11 +11,13 @@ import { leadFieldsFromArgs, parseWebhook } from '../lib/parse-call.mjs';
 import { checkAvailability, dayWindow, planBooking, readStartTime, toolDate, toolName } from '../lib/tools.mjs';
 import { alertIfNewLead, pushToClient } from '../lib/alerts.mjs';
 import { announceBooking, textCaller } from '../lib/followups.mjs';
+import { notifyOwner } from '../lib/owner.mjs';
 import { rest, restJson } from '../lib/rest.mjs';
 import { DEFAULT_TZ, formatDayInZone, formatTimeInZone } from '../../src/lib/time.js';
 
 const json = (status, body) => Response.json(body, { status });
 const PRO_COLUMNS = ['recording_url', 'transcript', 'summary', 'job_type'];
+const OWNER_COLUMNS = ['cost_usd'];
 
 function sameSecret(given, expected) {
   // Hash both so the comparison is constant-time regardless of length.
@@ -48,13 +50,19 @@ async function saveCall(clientId, vapiCallId, row) {
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify({ ...fields, client_id: clientId, vapi_call_id: vapiCallId }),
     });
-  try {
-    await save(row);
-  } catch (err) {
-    // Database not upgraded yet (pro_features migration not run): save the basics.
-    if (!/column/i.test(err.message)) throw err;
-    console.warn('vapi-webhook: newer columns missing, saving basic call details only');
-    await save(Object.fromEntries(Object.entries(row).filter(([key]) => !PRO_COLUMNS.includes(key))));
+  // Newest columns first; if the database hasn't had that update yet, drop them and try again.
+  const without = (keys) => Object.fromEntries(Object.entries(row).filter(([key]) => !keys.includes(key)));
+  const attempts = [row, without(OWNER_COLUMNS), without([...OWNER_COLUMNS, ...PRO_COLUMNS])].filter(
+    (attempt, i, all) => i === 0 || Object.keys(attempt).length !== Object.keys(all[i - 1]).length,
+  );
+  for (let i = 0; i < attempts.length; i++) {
+    try {
+      await save(attempts[i]);
+      return;
+    } catch (err) {
+      if (!/column/i.test(err.message) || i === attempts.length - 1) throw err;
+      console.warn('vapi-webhook: newer columns missing, saving without them');
+    }
   }
 }
 
@@ -64,6 +72,7 @@ async function textCallerSafely(vapiCallId) {
     console.log('vapi-webhook: caller text', JSON.stringify(await textCaller(vapiCallId)));
   } catch (err) {
     console.error('vapi-webhook: caller text failed', err?.message ?? err);
+    await notifyOwner({ kind: 'sms_failed', message: `A thank-you text to a caller didn't send (${String(err?.message ?? err).slice(0, 120)}). Check Twilio.` });
   }
 }
 
@@ -126,6 +135,10 @@ async function handleToolCalls({ assistantId, vapiCallId, customerNumber, calls 
         console.warn(`vapi-webhook: tool "${call.name}" isn't handled here`);
         result = 'Noted.';
       } else if (!client) {
+        await notifyOwner({
+          kind: 'unknown_assistant',
+          message: `Elliot tried to ${name === 'save_lead' ? 'save a lead' : 'check or book a time'} on Vapi assistant ${assistantId ?? '(none)'}, but no business has that assistant ID. Fix it on the owner page.`,
+        });
         result = "Sorry, I can't reach the system right now. I'll pass your details on and someone will call you back.";
       } else if (name === 'save_lead') {
         const fields = leadFieldsFromArgs(call.args);
@@ -154,6 +167,11 @@ async function handleToolCalls({ assistantId, vapiCallId, customerNumber, calls 
       }
     } catch (err) {
       console.error(`vapi-webhook: ${name ?? call.name} failed:`, err?.message ?? err);
+      await notifyOwner({
+        clientId: client?.id ?? null,
+        kind: 'tool_failed',
+        message: `Elliot's ${name ?? call.name} didn't work (${String(err?.message ?? err).slice(0, 120)}). The caller was told the team will call back.`,
+      });
       if (name === 'book_job' && client && vapiCallId) await rememberWantedTime(client, vapiCallId, call.args);
       result =
         name === 'save_lead'
@@ -191,6 +209,10 @@ export default async (req) => {
     const client = await findClient(parsed.assistantId);
     if (!client) {
       console.warn(`vapi-webhook: no client for assistant ${parsed.assistantId}`);
+      await notifyOwner({
+        kind: 'unknown_assistant',
+        message: `A call came in on Vapi assistant ${parsed.assistantId}, but no business has that assistant ID, so it wasn't saved. Fix it on the owner page.`,
+      });
       // 200 so Vapi doesn't retry forever; the call simply isn't attributed to anyone.
       return json(200, { ok: false, error: 'Unknown assistant' });
     }
@@ -200,6 +222,7 @@ export default async (req) => {
     return json(200, { ok: true });
   } catch (err) {
     console.error('vapi-webhook:', err);
+    await notifyOwner({ kind: 'save_failed', message: `A call couldn't be saved (${String(err?.message ?? err).slice(0, 120)}). Vapi will retry.` });
     return json(502, { error: 'Could not save call' });
   }
 };

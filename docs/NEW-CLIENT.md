@@ -16,11 +16,11 @@ About **30 minutes** per client. Do the steps in order and tick them off as you 
 
 | Thing | Where it lives |
 |---|---|
-| Their login (email + password) | They make it themselves (Step 2) |
-| Business name, state/time zone, hours, prices, trade | Supabase row (Step 4) + Elliot's prompt (Step 3) |
+| Their login (email + password) | They make it themselves (Step 2), and it links up by itself |
+| Business name, state/time zone, hours, prices, trade | Owner page (Step 4) + Elliot's prompt (Step 3) |
 | Their own Elliot (Vapi assistant) with their own script | Vapi → Assistants (Step 3) |
 | Their own phone number for Elliot | Vapi → Phone Numbers (Step 3) |
-| Their mobile for alerts, and the number customers ring back on | Supabase row (Step 4) |
+| Their mobile for alerts, and the number customers ring back on | Owner page (Step 4) |
 
 ---
 
@@ -99,42 +99,50 @@ https://elliotai-portal.netlify.app/api/vapi-webhook?secret=Soccerstar.11
 
 ---
 
-## Step 4: Their business in Supabase (3 min, one paste)
+## Step 4: Add them on your owner page (2 min)
 
-1. In **Supabase**, click **SQL Editor**, then **+ New query**.
-2. Paste the box below.
-3. Change every line marked **CHANGE**, using their answers. Keep the quote marks `' '` around words.
-4. Click **Run**.
+1. Open **https://elliotai-portal.netlify.app/owner.html** and tap **+ Add a client**.
+2. Fill it in from their answers:
+   - business name, login email, state
+   - their mobile, opening hours and call-back times
+   - your monthly fee and their average job value
+   - the **Vapi assistant ID** from Step 3D
+3. Tap **Save client**.
+   - It tells you if anything is missing or wrong.
+   - Their **state sets their time zone** by itself.
+   - Their **login links up by itself**, whether they signed up already (Step 2) or sign up later.
+4. Their card appears in your list. The dot turns green after their first call.
+
+<details>
+<summary>Owner page not set up yet? Use the Supabase paste instead</summary>
+
+In **Supabase → SQL Editor → + New query**, paste this, change every line marked CHANGE, then click **Run**:
 
 ```sql
 insert into public.clients (
-  user_id, business_name, state, business_hours,
+  user_id, owner_email, business_name, state, business_hours,
   callback_urgent_minutes, callback_standard_minutes,
   avg_job_value, monthly_fee, alert_phone, business_phone,
   review_url, vapi_assistant_id
 )
 select
-  id,
-  'Smith Plumbing',                  -- CHANGE: business name (answer 1)
-  'WA',                              -- CHANGE: state: QLD NSW VIC TAS ACT SA NT WA (answer 5)
+  (select id from auth.users where lower(email) = lower('owner@smithplumbing.com.au')),  -- CHANGE: their login email
+  'owner@smithplumbing.com.au',      -- CHANGE: the same email again
+  'Smith Plumbing',                  -- CHANGE: business name
+  'WA',                              -- CHANGE: state: QLD NSW VIC TAS ACT SA NT WA
   '{"mon":["07:00","17:00"],"tue":["07:00","17:00"],"wed":["07:00","17:00"],"thu":["07:00","17:00"],"fri":["07:00","17:00"],"sat":["08:00","12:00"],"sun":null}'::jsonb,
-                                     -- CHANGE: hours, 24-hour time, null = closed (answer 7)
-  60,                                -- CHANGE: urgent call-back in minutes (answer 11)
-  240,                               -- CHANGE: everyone else, in minutes (answer 11)
-  2500,                              -- CHANGE: average job value in $ (answer 13)
-  750,                               -- CHANGE: what you charge them per month in $
-  '0412 345 678',                    -- CHANGE: their mobile, for alerts (answer 3)
-  '08 9000 0000',                    -- CHANGE: number customers ring back on (answer 4)
-  null,                              -- CHANGE: Google review link in quotes, or leave null (answer 14)
+                                     -- CHANGE: hours, 24-hour time, null = closed
+  60,                                -- CHANGE: urgent call-back in minutes
+  240,                               -- CHANGE: everyone else, in minutes
+  2500,                              -- CHANGE: average job value in $
+  1000,                              -- CHANGE: your monthly fee in $
+  '0412 345 678',                    -- CHANGE: their mobile, for alerts
+  null,                              -- number customers ring back on, or null to use their mobile
+  null,                              -- Google review link in quotes, or null
   'PASTE-ASSISTANT-ID-HERE'          -- CHANGE: the Vapi assistant ID from Step 3D
-from auth.users
-where email = 'owner@smithplumbing.com.au'   -- CHANGE: their login email (answer 2)
-returning business_name, state, timezone, vapi_assistant_id;
+returning business_name, state, timezone;
 ```
-
-5. You should see **1 row** with their business, state and time zone. ✅
-   - **"0 rows"?** They haven't made their login yet (Step 2), or the email is different. Check under **Authentication → Users**.
-   - **"duplicate key … vapi_assistant_id"?** That assistant ID is already used by another business. Check Step 3D.
+</details>
 
 ---
 
@@ -175,12 +183,23 @@ If it doesn't work on theirs, they can ask their phone company for "conditional 
 
 ---
 
+## Step 7: Get paid (1 min)
+
+1. On your owner page, tap **Payment link** on their card.
+2. Tap **Copy link** and text or email it to them.
+3. Once they pay, their card shows **Paid**. Stripe charges them every month after that.
+   - If a payment fails, you get an alert.
+   - They can change their card themselves under **⚙️ → Payment details** in their app.
+
+---
+
 ## Quick checklist (tick for each client)
 
 - [ ] 1. Sent the questions and got their answers
 - [ ] 2. They made their login
 - [ ] 3. Duplicated Elliot, pasted their filled-in script, checked tools and Server URL, published
 - [ ] 3. Copied the assistant ID and gave Elliot a phone number
-- [ ] 4. Ran the Supabase paste and got 1 row back
+- [ ] 4. Added them on the owner page
 - [ ] 5. Made a test call and a test booking
 - [ ] 6. Sent the welcome message; they added the app and turned on notifications
+- [ ] 7. Sent the payment link and they show as Paid

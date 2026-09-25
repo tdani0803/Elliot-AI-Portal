@@ -8,6 +8,7 @@ const BASE_CLIENT_COLUMNS = 'id, business_name, avg_job_value, conversion_rate';
 const PRO_CLIENT_COLUMNS = `${BASE_CLIENT_COLUMNS}, monthly_fee, timezone, business_hours, review_url`;
 const ALERT_CLIENT_COLUMNS = `${PRO_CLIENT_COLUMNS}, callback_urgent_minutes, callback_standard_minutes, calendar_token`;
 const FOLLOW_UP_CLIENT_COLUMNS = `${ALERT_CLIENT_COLUMNS}, text_callers, remind_customers, weekly_summary`;
+const BILLING_CLIENT_COLUMNS = `${FOLLOW_UP_CLIENT_COLUMNS}, billing_status`;
 const MAX_CALLS = 3000;
 
 // "column does not exist" / "relation does not exist" => the pro_features migration isn't run yet.
@@ -17,6 +18,7 @@ function supabaseSource() {
   let pro = true;
   let alerts = true;
   let followUps = true;
+  let billing = true;
 
   async function select(table, proCols, baseCols, build) {
     if (pro) {
@@ -42,6 +44,12 @@ function supabaseSource() {
     },
     async client() {
       // Newest features first; fall back if the matching database update hasn't been run.
+      if (billing) {
+        const { data, error } = await supabase.from('clients').select(BILLING_CLIENT_COLUMNS).maybeSingle();
+        if (!error) return data;
+        if (!isMissingSchema(error)) throw error;
+        billing = false;
+      }
       if (followUps) {
         const { data, error } = await supabase.from('clients').select(FOLLOW_UP_CLIENT_COLUMNS).maybeSingle();
         if (!error) return data;
@@ -113,6 +121,14 @@ function supabaseSource() {
       if (error) throw error;
     },
     // The tradie's own on/off switches (text callers, remind customers, weekly summary).
+    // Stripe's page for their card and invoices.
+    async billingPortal() {
+      const { data } = await supabase.auth.getSession();
+      const res = await fetch('/api/billing-portal', { method: 'POST', headers: { Authorization: `Bearer ${data.session?.access_token}` } });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "Couldn't open the payment page.");
+      return body.url;
+    },
     async saveSettings(clientId, patch) {
       const { error } = await supabase.from('clients').update(patch).eq('id', clientId);
       if (error) throw error;
@@ -144,6 +160,9 @@ async function demoSource() {
     pro: true,
     alerts: true,
     followUps: true,
+    billingPortal: async () => {
+      throw new Error('Payments open on the real site, not in demo mode.');
+    },
     saveSettings: async (_id, patch) => {
       await pause();
       Object.assign(demoClient, patch);

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1f3a" />
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="/favicon.png?v=2" type="image/png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
+  <link rel="manifest" href="/manifest.webmanifest?v=2" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="ElliotAI" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700&display=swap" />
+  <script>
+    // If anything breaks while loading, say so on screen instead of leaving a dead page.
+    (function () {
+      function show(detail) {
+        if (document.getElementById('fatal')) return;
+        var box = document.createElement('p');
+        box.id = 'fatal';
+        box.setAttribute('role', 'alert');
+        box.style.cssText = 'position:fixed;inset:16px 16px auto;z-index:99;margin:0;padding:14px 16px;background:#fde4e1;border:3px solid #111418;border-radius:12px;font:600 16px/1.4 system-ui,sans-serif;color:#111418';
+        box.textContent = 'Sorry, this page didn\'t load properly. Please refresh. If it keeps happening, contact ElliotAI. (Details: ' + detail + ')';
+        (document.body || document.documentElement).prepend(box);
+      }
+      window.addEventListener('error', function (e) { if (e.message) show(e.message); });
+      window.addEventListener('unhandledrejection', function (e) { show((e.reason && e.reason.message) || String(e.reason)); });
+    })();
+  </script>
+  <title>Owner · ElliotAI</title>
+</head>
+<body>
+  <div class="demo-banner" id="demo-banner" hidden>Demo mode — showing sample data</div>
+  <header class="topbar">
+    <span class="wordmark" role="img" aria-label="ElliotAI"><span class="wordmark__text" aria-hidden="true">Elliot<span>AI</span></span></span>
+    <span class="owner-tag">Owner</span>
+  </header>
+
+  <main class="page page--wide" id="view" aria-busy="true" aria-live="polite">
+    <p class="muted center">Loading…</p>
+  </main>
+
+  <dialog class="sheet sheet--wide" id="client-dialog" aria-labelledby="client-title">
+    <form class="sheet__form" id="client-form" novalidate>
+      <h2 class="section-title" id="client-title">Add a client</h2>
+      <input type="hidden" name="id" />
+
+      <fieldset class="form-group"><legend>The business</legend>
+        <div class="field"><label for="c-name">Business name</label><input id="c-name" name="business_name" autocomplete="off" placeholder="e.g. Smith Plumbing" /><p class="field-error" data-error="business_name"></p></div>
+        <div class="field"><label for="c-email">Their login email</label><input id="c-email" name="owner_email" type="email" autocomplete="off" placeholder="owner@smithplumbing.com.au" /><p class="field-error" data-error="owner_email"></p>
+          <p class="field-hint">They sign up with this email. It links up by itself, whether they sign up before or after you save this.</p></div>
+        <div class="field"><label for="c-state">State</label>
+          <select id="c-state" name="state"><option value="">Pick one</option><option>QLD</option><option>NSW</option><option>VIC</option><option>TAS</option><option>ACT</option><option>SA</option><option>NT</option><option>WA</option></select>
+          <p class="field-hint">Sets their time zone automatically.</p><p class="field-error" data-error="state"></p></div>
+      </fieldset>
+
+      <fieldset class="form-group"><legend>Phones</legend>
+        <div class="field"><label for="c-alert">Their mobile (for job alerts)</label><input id="c-alert" name="alert_phone" type="tel" autocomplete="off" placeholder="0412 345 678" /></div>
+        <div class="field"><label for="c-biz">Number customers ring back on (optional)</label><input id="c-biz" name="business_phone" type="tel" autocomplete="off" placeholder="Leave empty to use their mobile" /></div>
+      </fieldset>
+
+      <fieldset class="form-group"><legend>Opening hours</legend>
+        <div class="hours" id="c-hours"></div>
+        <p class="field-error" data-error="business_hours"></p>
+      </fieldset>
+
+      <fieldset class="form-group"><legend>Call-backs Elliot promises</legend>
+        <div class="field-row">
+          <div class="field"><label for="c-urgent">Urgent</label><select id="c-urgent" name="callback_urgent_minutes"></select></div>
+          <div class="field"><label for="c-standard">Everything else</label><select id="c-standard" name="callback_standard_minutes"></select></div>
+        </div>
+        <p class="field-hint">Elliot's script must say the same times.</p>
+      </fieldset>
+
+      <fieldset class="form-group"><legend>Money</legend>
+        <div class="field-row">
+          <div class="field"><label for="c-fee">Monthly fee ($)</label><input id="c-fee" name="monthly_fee" type="number" inputmode="decimal" min="0" step="1" placeholder="1000" /><p class="field-error" data-error="monthly_fee"></p></div>
+          <div class="field"><label for="c-avg">Average job ($)</label><input id="c-avg" name="avg_job_value" type="number" inputmode="decimal" min="0" step="1" placeholder="2500" /></div>
+        </div>
+      </fieldset>
+
+      <fieldset class="form-group"><legend>Connections</legend>
+        <div class="field"><label for="c-vapi">Vapi assistant ID</label><input id="c-vapi" name="vapi_assistant_id" autocomplete="off" placeholder="Paste from Vapi (can add later)" /><p class="field-error" data-error="vapi_assistant_id"></p></div>
+        <div class="field"><label for="c-review">Google review link (optional)</label><input id="c-review" name="review_url" type="url" autocomplete="off" placeholder="https://g.page/r/…" /><p class="field-error" data-error="review_url"></p></div>
+      </fieldset>
+
+      <p class="notice notice--error" id="client-error" role="alert" hidden></p>
+      <div class="sheet__actions">
+        <button class="btn" type="submit">Save client</button>
+        <button class="btn btn--ghost" type="button" data-close>Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="sheet" id="link-dialog" aria-labelledby="link-title">
+    <div class="sheet__form">
+      <h2 class="section-title" id="link-title">Payment link</h2>
+      <p id="link-text">Send this to the client. Once they pay, their billing shows as <strong>Paid</strong> here.</p>
+      <input class="copy-box" id="link-url" readonly />
+      <div class="sheet__actions">
+        <button class="btn" type="button" id="link-copy">Copy link</button>
+        <button class="btn btn--ghost" type="button" data-close>Done</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <script type="module" src="/src/pages/owner.js"></script>
+</body>
+</html>
