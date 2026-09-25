@@ -10,7 +10,8 @@ About **30 minutes** per client. Do the steps in order and tick them off as you 
 
 - The website (Netlify) and the database (Supabase), including all the SQL updates
 - The Vapi tools **check_availability** and **book_job**
-- The Server URL and secret: `https://elliotai-portal.netlify.app/api/vapi-webhook?secret=Soccerstar.11`
+- The Server URL and secret: `https://elliotai-portal.netlify.app/api/vapi-webhook?secret=YOUR-VAPI-SECRET`
+  (swap `YOUR-VAPI-SECRET` for your secret, the same as `VAPI_WEBHOOK_SECRET` in Netlify; never put the real one in these guides)
 
 **Different for every client (this guide):**
 
@@ -81,7 +82,7 @@ https://elliotai-portal.netlify.app/signup.html
 ### 3C: Check the connections (these copy over, but check)
 1. **Server URL** (on the **Advanced** tab) must be:
 ```
-https://elliotai-portal.netlify.app/api/vapi-webhook?secret=Soccerstar.11
+https://elliotai-portal.netlify.app/api/vapi-webhook?secret=YOUR-VAPI-SECRET
 ```
 2. **Tools** tab: **check_availability**, **book_job** and **End Call** are all there.
 3. **Analysis** tab: **Structured Outputs** (or Structured Data) is on, with the fields name, callback_number, address, issue, details, urgency, job_type.

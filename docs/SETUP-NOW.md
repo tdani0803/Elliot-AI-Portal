@@ -313,8 +313,10 @@ Click **check_availability** and check these 3 things. Then do the same for **bo
 1. **Server URL** must be exactly this (paste it over what's there):
 
 ```
-https://elliotai-portal.netlify.app/api/vapi-webhook?secret=Soccerstar.11
+https://elliotai-portal.netlify.app/api/vapi-webhook?secret=YOUR-VAPI-SECRET
 ```
+
+Swap `YOUR-VAPI-SECRET` for your secret (the same as `VAPI_WEBHOOK_SECRET` in Netlify).
 
 2. **Async** must be **OFF** (the switch is grey, not coloured).
 3. Click **Save**.
